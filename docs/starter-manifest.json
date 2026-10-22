@@ -1,0 +1,413 @@
+{
+  "source_repository": "https://gitee.com/ncepu-bj/ncepu_ideal-skills",
+  "source_zip_sha256": "a5a4ee0d4d4108f734f8b7308005eb33ba816d4725527c2b968f51005d225620",
+  "source_template": "ncepu_ideal-skills-develop/sql-to-fastapi-restfulapi-scaffold/resources/templates/project_structure/",
+  "source_file_count": 65,
+  "unchanged_count": 54,
+  "modified_count": 11,
+  "source_files": [
+    {
+      "path": ".env.docker",
+      "source_sha256": "d5bcf15a5fe85216f1c962e4524d58a3ed3f21c5e1988aeadb324b91037f5b29",
+      "initialized_sha256": "d5bcf15a5fe85216f1c962e4524d58a3ed3f21c5e1988aeadb324b91037f5b29",
+      "status": "unchanged"
+    },
+    {
+      "path": ".env.example",
+      "source_sha256": "7fd62cfeb10cc2873e452fd57e119afe4d76fa3bd74c4f42a1365df55e9ff4b0",
+      "initialized_sha256": "3fbe28f3f9b3e59e0fce91b383f76fc62f9576071b7892e6305f933bdaa20cf4",
+      "status": "modified"
+    },
+    {
+      "path": ".python-version",
+      "source_sha256": "7b55f8e67b5623c4bef3fa691288da9437d79d3aba156de48d481db32ac7d16d",
+      "initialized_sha256": "7b55f8e67b5623c4bef3fa691288da9437d79d3aba156de48d481db32ac7d16d",
+      "status": "unchanged"
+    },
+    {
+      "path": "__init__.py",
+      "source_sha256": "ccac56716976af782c611eceda10cc905582c6a1cd601e7543f418f56fd45474",
+      "initialized_sha256": "ccac56716976af782c611eceda10cc905582c6a1cd601e7543f418f56fd45474",
+      "status": "unchanged"
+    },
+    {
+      "path": "api/__init__.py",
+      "source_sha256": "aecb58894395a59faf5ccb2a20fe586401a30ad2237ef6cd45e09ebe6215c100",
+      "initialized_sha256": "aecb58894395a59faf5ccb2a20fe586401a30ad2237ef6cd45e09ebe6215c100",
+      "status": "unchanged"
+    },
+    {
+      "path": "api/v1/__init__.py",
+      "source_sha256": "06c8116d1fe66ed0c22ff3a37403181e946604a2318857d208762e40c9382375",
+      "initialized_sha256": "06c8116d1fe66ed0c22ff3a37403181e946604a2318857d208762e40c9382375",
+      "status": "unchanged"
+    },
+    {
+      "path": "app/__init__.py",
+      "source_sha256": "62580dd481cc3b2b5a5db833148c64a48d4f0b60b171a15941558683f76d18a3",
+      "initialized_sha256": "62580dd481cc3b2b5a5db833148c64a48d4f0b60b171a15941558683f76d18a3",
+      "status": "unchanged"
+    },
+    {
+      "path": "app/config.py",
+      "source_sha256": "8cc7c9f5889e268c5369ca31bb87d585ea32e08dec19bf5c4b2d695ab43a697f",
+      "initialized_sha256": "8cc7c9f5889e268c5369ca31bb87d585ea32e08dec19bf5c4b2d695ab43a697f",
+      "status": "unchanged"
+    },
+    {
+      "path": "app/exceptions.py",
+      "source_sha256": "b5b597c4c7b2e7f268e52c7ff58c27e37a158c1f40fd5681df2f331644552490",
+      "initialized_sha256": "b5b597c4c7b2e7f268e52c7ff58c27e37a158c1f40fd5681df2f331644552490",
+      "status": "unchanged"
+    },
+    {
+      "path": "app/factory.py",
+      "source_sha256": "107febd197a9258b5f60ff22e14fff320e979c710d0d35e9c50fbaf0bdb0ee3d",
+      "initialized_sha256": "5bcc50a5da2981eeb3b718209fe0b78014b00775ca5e117910b900cd4624f787",
+      "status": "modified"
+    },
+    {
+      "path": "app/middleware.py",
+      "source_sha256": "1c9213ab1ea77d0ebde14137f60a287d69b319054e8675b3bbeca5d2708407b4",
+      "initialized_sha256": "1c9213ab1ea77d0ebde14137f60a287d69b319054e8675b3bbeca5d2708407b4",
+      "status": "unchanged"
+    },
+    {
+      "path": "app/routes.py",
+      "source_sha256": "2d483440bd4f8af19ac48a73df310bb025098da01074e0d7258e4510918da7ee",
+      "initialized_sha256": "2d98165cea023ee0bd7d9c46b85383881f389b6544522a1d0073685425046e5a",
+      "status": "modified"
+    },
+    {
+      "path": "config/__init__.py",
+      "source_sha256": "02c4493c5a8971d85534ed1126fdba3c6cf31951b18602692a5f21527cb63706",
+      "initialized_sha256": "02c4493c5a8971d85534ed1126fdba3c6cf31951b18602692a5f21527cb63706",
+      "status": "unchanged"
+    },
+    {
+      "path": "config/config_factory.py",
+      "source_sha256": "6c11d73b3af3d97b1200a430474ec85df0a548ce12e5588426df23b941f046e5",
+      "initialized_sha256": "6c11d73b3af3d97b1200a430474ec85df0a548ce12e5588426df23b941f046e5",
+      "status": "unchanged"
+    },
+    {
+      "path": "config/config_unified.py",
+      "source_sha256": "e1f0fe2f8d4586a66a97959f5e7ed90ba1f415608a3518b34ffe22b242ceb78e",
+      "initialized_sha256": "7adf988c95becd710e06b0170d17e7ebed5a1db94a8b858e0bf3fbfcdc1e8906",
+      "status": "modified"
+    },
+    {
+      "path": "config/manage.py",
+      "source_sha256": "9bb1c1fb0218a436a513992414ebfa986751e0d3fb4b779236090935098070ec",
+      "initialized_sha256": "9bb1c1fb0218a436a513992414ebfa986751e0d3fb4b779236090935098070ec",
+      "status": "unchanged"
+    },
+    {
+      "path": "core/__init__.py",
+      "source_sha256": "e28ccc14c234831e98f95a0121caafc57ba00e50e62bb44f18e486e55ab3229b",
+      "initialized_sha256": "c6590175f5477a311bd3a2ed2864696fc5892495a0b5c0c0323c0405491da0d7",
+      "status": "modified"
+    },
+    {
+      "path": "core/cache.py",
+      "source_sha256": "2123222828d13789811d95e7e44581e4552395177fd6fa66d1b76358aa65b044",
+      "initialized_sha256": "2123222828d13789811d95e7e44581e4552395177fd6fa66d1b76358aa65b044",
+      "status": "unchanged"
+    },
+    {
+      "path": "core/database.py",
+      "source_sha256": "dc89ebe5127d11bcefff177271c97ba7002f2ba4cf29ec2da86d691e3d88b76c",
+      "initialized_sha256": "dc89ebe5127d11bcefff177271c97ba7002f2ba4cf29ec2da86d691e3d88b76c",
+      "status": "unchanged"
+    },
+    {
+      "path": "core/permissions.py",
+      "source_sha256": "ba3fef1addae9a58576d3cb8d846e582a462daa773f6072c0dfa50dd6b29bf6a",
+      "initialized_sha256": "0df4c9e87aa36c1f0e456d14d73fa92c4ed2350c6a6ba60e24bc4483536f9109",
+      "status": "modified"
+    },
+    {
+      "path": "core/queue.py",
+      "source_sha256": "0a0639443cb820dd8f5fdd4918599357aefa8e78b5041e80615f4be2f436f626",
+      "initialized_sha256": "0a0639443cb820dd8f5fdd4918599357aefa8e78b5041e80615f4be2f436f626",
+      "status": "unchanged"
+    },
+    {
+      "path": "core/security.py",
+      "source_sha256": "f654fde2f5848ee030db337093659275904e33090b544b8f861946cd0fc278cc",
+      "initialized_sha256": "f654fde2f5848ee030db337093659275904e33090b544b8f861946cd0fc278cc",
+      "status": "unchanged"
+    },
+    {
+      "path": "deploy/README.md",
+      "source_sha256": "64a96e1471b72d305b0dab8600e4408145f83b5052c8cd4192081ea98471e104",
+      "initialized_sha256": "64a96e1471b72d305b0dab8600e4408145f83b5052c8cd4192081ea98471e104",
+      "status": "unchanged"
+    },
+    {
+      "path": "deploy/__init__.py",
+      "source_sha256": "63cb8b36899e043e052fa9998ad8b8b7a69b2d455a0d1f4cad0a145e488a17b1",
+      "initialized_sha256": "63cb8b36899e043e052fa9998ad8b8b7a69b2d455a0d1f4cad0a145e488a17b1",
+      "status": "unchanged"
+    },
+    {
+      "path": "deploy/alert_rules.yml",
+      "source_sha256": "2c52508dde119b8013829f3e1c2042b52f4f70f4004d758fbbb177d4efe1df39",
+      "initialized_sha256": "2c52508dde119b8013829f3e1c2042b52f4f70f4004d758fbbb177d4efe1df39",
+      "status": "unchanged"
+    },
+    {
+      "path": "deploy/docker-deploy.ps1",
+      "source_sha256": "41f63e985814e1bdfd4dbec18fdcee7b029ac214c7cf7f6aeedc9e72db17e607",
+      "initialized_sha256": "41f63e985814e1bdfd4dbec18fdcee7b029ac214c7cf7f6aeedc9e72db17e607",
+      "status": "unchanged"
+    },
+    {
+      "path": "deploy/docker-deploy.sh",
+      "source_sha256": "44c2da12dfe592e5cc853d375e81fcc8ba543403af9adc35e2126ec5efe8bccf",
+      "initialized_sha256": "44c2da12dfe592e5cc853d375e81fcc8ba543403af9adc35e2126ec5efe8bccf",
+      "status": "unchanged"
+    },
+    {
+      "path": "deploy/grafana/provisioning/dashboards/dashboard.yml",
+      "source_sha256": "11941d385a35a325a76d268cb6586d0b18cd9afe497cf5150d3b0b1cafc0219e",
+      "initialized_sha256": "11941d385a35a325a76d268cb6586d0b18cd9afe497cf5150d3b0b1cafc0219e",
+      "status": "unchanged"
+    },
+    {
+      "path": "deploy/grafana/provisioning/datasources/prometheus.yml",
+      "source_sha256": "28a66ce35e9a2165eabd0f68a2728513906c50598c173511bc84a763de60d5c5",
+      "initialized_sha256": "28a66ce35e9a2165eabd0f68a2728513906c50598c173511bc84a763de60d5c5",
+      "status": "unchanged"
+    },
+    {
+      "path": "deploy/logstash/config/logstash.yml",
+      "source_sha256": "5848fa7cf991930c36dd3ae613e0db6db77406db7651c7e56abc7fd42ff5a9d4",
+      "initialized_sha256": "5848fa7cf991930c36dd3ae613e0db6db77406db7651c7e56abc7fd42ff5a9d4",
+      "status": "unchanged"
+    },
+    {
+      "path": "deploy/logstash/pipeline/fastapi.conf",
+      "source_sha256": "99ad9d9ff1c74f18995212f85810ec297674c8f20a293ce87ef51ed6f1ee436f",
+      "initialized_sha256": "99ad9d9ff1c74f18995212f85810ec297674c8f20a293ce87ef51ed6f1ee436f",
+      "status": "unchanged"
+    },
+    {
+      "path": "deploy/mysql-prod.cnf",
+      "source_sha256": "4cff1852d8ea19034849bcb7ca3cb5c74d214e35c54eb8b07a0ad6e6897f5324",
+      "initialized_sha256": "4cff1852d8ea19034849bcb7ca3cb5c74d214e35c54eb8b07a0ad6e6897f5324",
+      "status": "unchanged"
+    },
+    {
+      "path": "deploy/mysql.cnf",
+      "source_sha256": "a4ebb55b8fae04abc88b7d57c2b8c525be33b968875d486511df89392a825979",
+      "initialized_sha256": "a4ebb55b8fae04abc88b7d57c2b8c525be33b968875d486511df89392a825979",
+      "status": "unchanged"
+    },
+    {
+      "path": "deploy/nginx-prod.conf",
+      "source_sha256": "443c38ac4f5f494946ae89a349a3e0fefaba9db99a2b583facc2bf2356fc9e16",
+      "initialized_sha256": "443c38ac4f5f494946ae89a349a3e0fefaba9db99a2b583facc2bf2356fc9e16",
+      "status": "unchanged"
+    },
+    {
+      "path": "deploy/nginx.conf",
+      "source_sha256": "331f5aff34c73f05086e3952664f5595a0665a57c6be10baa32aa1d9ea0b6ad5",
+      "initialized_sha256": "331f5aff34c73f05086e3952664f5595a0665a57c6be10baa32aa1d9ea0b6ad5",
+      "status": "unchanged"
+    },
+    {
+      "path": "deploy/prometheus.yml",
+      "source_sha256": "7f9c539f9179fda31f7fe2503b51c6dcec8d53fee167ba49cde7e185542e3c5a",
+      "initialized_sha256": "7f9c539f9179fda31f7fe2503b51c6dcec8d53fee167ba49cde7e185542e3c5a",
+      "status": "unchanged"
+    },
+    {
+      "path": "deploy/redis.conf",
+      "source_sha256": "43713748e56cc334db77ca27194ef382d0995093ab5d8eff147d6b198831cd4e",
+      "initialized_sha256": "43713748e56cc334db77ca27194ef382d0995093ab5d8eff147d6b198831cd4e",
+      "status": "unchanged"
+    },
+    {
+      "path": "deploy/supervisor.conf",
+      "source_sha256": "339a663a9a8eae503a2a715afb6d985a2f3fce966e51226ed948e60936413865",
+      "initialized_sha256": "339a663a9a8eae503a2a715afb6d985a2f3fce966e51226ed948e60936413865",
+      "status": "unchanged"
+    },
+    {
+      "path": "docker/Dockerfile",
+      "source_sha256": "40e93a0be8c9897f43ea6275098bfb90d789866bb46ae4d944f8cee7b8cdd9c6",
+      "initialized_sha256": "b6621ed9ab698d01710693000fb102e92b18546dfcfd6b8b8e8d0cf51a458f02",
+      "status": "modified"
+    },
+    {
+      "path": "docker/README.md",
+      "source_sha256": "8e54397d9ce48c58af142d871da6411367000365450cb97440a5604bdc5a9b3b",
+      "initialized_sha256": "8e54397d9ce48c58af142d871da6411367000365450cb97440a5604bdc5a9b3b",
+      "status": "unchanged"
+    },
+    {
+      "path": "docker/docker-compose.yml",
+      "source_sha256": "c5556e8aece1571b97fb8cc4ac5080878ee086dc43662bd293ba88620991d14d",
+      "initialized_sha256": "184cea85f8d6e01fc601d4c15efb8078c3d6429bb5cd8c70e0339598f2cce405",
+      "status": "modified"
+    },
+    {
+      "path": "middleware/__init__.py",
+      "source_sha256": "f51b466a02f0c11d42b77314318f1a407637f143363aa5353eb8088e66d8136b",
+      "initialized_sha256": "f51b466a02f0c11d42b77314318f1a407637f143363aa5353eb8088e66d8136b",
+      "status": "unchanged"
+    },
+    {
+      "path": "middleware/audit_middleware.py",
+      "source_sha256": "1bc321adb8e433b88c1c7f3ca878058978c3c6e580a7001b49e0ab2e0bdb209d",
+      "initialized_sha256": "1bc321adb8e433b88c1c7f3ca878058978c3c6e580a7001b49e0ab2e0bdb209d",
+      "status": "unchanged"
+    },
+    {
+      "path": "middleware/rate_limiter.py",
+      "source_sha256": "51e5d5b420e6b38544fa009fe0c80a289ba8019e357531429375038094e9d2a9",
+      "initialized_sha256": "51e5d5b420e6b38544fa009fe0c80a289ba8019e357531429375038094e9d2a9",
+      "status": "unchanged"
+    },
+    {
+      "path": "middleware/security_headers.py",
+      "source_sha256": "808e2f8dd9532e1a46f4ccc4e52da46c34aa0e62329c35065b47e9d12c6c4a2e",
+      "initialized_sha256": "808e2f8dd9532e1a46f4ccc4e52da46c34aa0e62329c35065b47e9d12c6c4a2e",
+      "status": "unchanged"
+    },
+    {
+      "path": "models/__init__.py",
+      "source_sha256": "19abe6971c83c76da163a8b428a18590f775840c808bc7267130b074d8f0b0d5",
+      "initialized_sha256": "19abe6971c83c76da163a8b428a18590f775840c808bc7267130b074d8f0b0d5",
+      "status": "unchanged"
+    },
+    {
+      "path": "models/base.py",
+      "source_sha256": "600908758608e37b031af185881fbc1b26f6d6efbf7ae2685723016a7927584b",
+      "initialized_sha256": "600908758608e37b031af185881fbc1b26f6d6efbf7ae2685723016a7927584b",
+      "status": "unchanged"
+    },
+    {
+      "path": "pyproject.toml",
+      "source_sha256": "84c7c103f3ebabf7edaaa115fbf0776f08200016c421b54d650976f690b4f9c9",
+      "initialized_sha256": "c62182ca9d29cc6f78ed8e54707bf8b0c7869343b2b72c3e9df02a1fc62a7b99",
+      "status": "modified"
+    },
+    {
+      "path": "repository/__init__.py",
+      "source_sha256": "16e55c7a6dc62d3e9ed74a0fe0b4627d9b0f05f49de2aff1122d20ff8a19b74b",
+      "initialized_sha256": "16e55c7a6dc62d3e9ed74a0fe0b4627d9b0f05f49de2aff1122d20ff8a19b74b",
+      "status": "unchanged"
+    },
+    {
+      "path": "requirements.txt",
+      "source_sha256": "4a729a98e74c7a1565a877c46670bd60f7fd080010a0abc44d8030cb29ce3383",
+      "initialized_sha256": "ab246614060b8257bcb334afb7e1770c9f12fbe2b138dc1a46e2cd0c56e9c637",
+      "status": "modified"
+    },
+    {
+      "path": "schemas/__init__.py",
+      "source_sha256": "90960f5fe194007646d27c14895ce29138c23cb9fc276a3ba9a8d129f671ddaf",
+      "initialized_sha256": "90960f5fe194007646d27c14895ce29138c23cb9fc276a3ba9a8d129f671ddaf",
+      "status": "unchanged"
+    },
+    {
+      "path": "schemas/response.py",
+      "source_sha256": "a1af5609552261807600952fed2f89b8f6a07cfa5a0e57daf8d8790dee504415",
+      "initialized_sha256": "a1af5609552261807600952fed2f89b8f6a07cfa5a0e57daf8d8790dee504415",
+      "status": "unchanged"
+    },
+    {
+      "path": "service/__init__.py",
+      "source_sha256": "e853802c3a75a270801ce6818054e8174309eef9dead5f0b212702a82ee58b3b",
+      "initialized_sha256": "e853802c3a75a270801ce6818054e8174309eef9dead5f0b212702a82ee58b3b",
+      "status": "unchanged"
+    },
+    {
+      "path": "service/dependencies.py",
+      "source_sha256": "9222b043229957d61307c7d2503c8d6a2973fd36236b94f08ec405c4c2efd1b2",
+      "initialized_sha256": "9222b043229957d61307c7d2503c8d6a2973fd36236b94f08ec405c4c2efd1b2",
+      "status": "unchanged"
+    },
+    {
+      "path": "start.py",
+      "source_sha256": "ed8979028d7bffcf180158c7b1c7ec1d2d43f435ccacb530723885c346816557",
+      "initialized_sha256": "54d14b7398bab2177d3dd752aa0b330fcb96fa3b5b3d4765ef21a1bb4e1c9dd3",
+      "status": "modified"
+    },
+    {
+      "path": "utils/__init__.py",
+      "source_sha256": "d1b265774030ba17645398fbc1cf8199edec70f52415eea13f0b52af64c6da48",
+      "initialized_sha256": "d1b265774030ba17645398fbc1cf8199edec70f52415eea13f0b52af64c6da48",
+      "status": "unchanged"
+    },
+    {
+      "path": "utils/audit.py",
+      "source_sha256": "be38725f5ef70c48cda42faa4c11f5fa1657ca54b721f205c6205afdff2aa00c",
+      "initialized_sha256": "be38725f5ef70c48cda42faa4c11f5fa1657ca54b721f205c6205afdff2aa00c",
+      "status": "unchanged"
+    },
+    {
+      "path": "utils/auth.py",
+      "source_sha256": "c5b9d8d816e5e86f7237cedaafed533895545b17132763b49a2c5ae8f46c119e",
+      "initialized_sha256": "c5b9d8d816e5e86f7237cedaafed533895545b17132763b49a2c5ae8f46c119e",
+      "status": "unchanged"
+    },
+    {
+      "path": "utils/custom_exceptions.py",
+      "source_sha256": "97570f98077aca93bc12bce6285e54fc64f8f19c83234e41e1b5ed9c4d0f0c08",
+      "initialized_sha256": "97570f98077aca93bc12bce6285e54fc64f8f19c83234e41e1b5ed9c4d0f0c08",
+      "status": "unchanged"
+    },
+    {
+      "path": "utils/ids.py",
+      "source_sha256": "a1421e6b0f7d6ef1b08e7a6039a896948cf5424e0296ba40b82d6baa5543e3c0",
+      "initialized_sha256": "a1421e6b0f7d6ef1b08e7a6039a896948cf5424e0296ba40b82d6baa5543e3c0",
+      "status": "unchanged"
+    },
+    {
+      "path": "utils/logger.py",
+      "source_sha256": "e0dca0b7592bda449d339e29533cb2ca26359c286a3beab5991d50d6eefacd7c",
+      "initialized_sha256": "e0dca0b7592bda449d339e29533cb2ca26359c286a3beab5991d50d6eefacd7c",
+      "status": "unchanged"
+    },
+    {
+      "path": "utils/masking.py",
+      "source_sha256": "98f5dc759904086ff41194a476ca653210bdd1a3d20c5becea5ac39ff70e8d4a",
+      "initialized_sha256": "98f5dc759904086ff41194a476ca653210bdd1a3d20c5becea5ac39ff70e8d4a",
+      "status": "unchanged"
+    },
+    {
+      "path": "utils/response_code.py",
+      "source_sha256": "7e63484e17a052beaa162a2cd99de0d0075dff35e8261f1eddb16eb54413f1f8",
+      "initialized_sha256": "7e63484e17a052beaa162a2cd99de0d0075dff35e8261f1eddb16eb54413f1f8",
+      "status": "unchanged"
+    },
+    {
+      "path": "utils/security.py",
+      "source_sha256": "16ceabeed6b9f74e1871633319c3bcbc0a6c4e8888c731020075cce473e14e7f",
+      "initialized_sha256": "16ceabeed6b9f74e1871633319c3bcbc0a6c4e8888c731020075cce473e14e7f",
+      "status": "unchanged"
+    },
+    {
+      "path": "utils/validators.py",
+      "source_sha256": "c3af8b4ff171a330b6356847532115f5f3a19120999595c04e33e5783fde4783",
+      "initialized_sha256": "c3af8b4ff171a330b6356847532115f5f3a19120999595c04e33e5783fde4783",
+      "status": "unchanged"
+    }
+  ],
+  "added_files": [
+    ".dockerignore",
+    ".gitattributes",
+    ".gitignore",
+    "CODEBUDDY.md",
+    "README.md",
+    "docs/starter-adjustments.patch",
+    "docs/starter-manifest.json",
+    "docs/starter-source.md",
+    "tests/conftest.py",
+    "tests/test_bootstrap.py",
+    "uv.lock"
+  ]
+}

@@ -1,0 +1,614 @@
+diff --git a/.env.example b/.env.example
+index 53bb06df6e69651a743660ace5fa9798b1f8ff75..8f9fb1cb572ca6edd3c352b8b31d4ee9426816a2 100644
+--- a/.env.example
++++ b/.env.example
+@@ -1,9 +1,10 @@
++# 起步阶段不初始化数据库、缓存或队列；这些变量是后续适配参考。
+ # 环境选择：development | testing | staging | production | docker
+ FASTAPI_ENV=development
+ 
+ # 应用
+-PROJECT_NAME=FastAPI Security Demo
+-PROJECT_VERSION=1.0.0
++PROJECT_NAME=yiban-api
++PROJECT_VERSION=0.1.0
+ DEBUG=true
+ LOG_LEVEL=DEBUG
+ API_VERSION=v1
+@@ -17,7 +18,7 @@ SECRET_KEY=dev-secret-key-not-for-production-use-only
+ ALGORITHM=HS256
+ ACCESS_TOKEN_EXPIRE_MINUTES=1440
+ ALLOWED_HOSTS=["localhost","127.0.0.1"]
+-CORS_ORIGINS=["http://localhost:3000","http://localhost:8080","http://127.0.0.1:3000"]
++CORS_ORIGINS=["http://localhost:5173","http://127.0.0.1:5173","http://localhost:8888","http://127.0.0.1:8888"]
+ CORS_ALLOW_CREDENTIALS=true
+ 
+ # Redis（可选；cache_enabled=false 时用内存缓存）
+@@ -26,7 +27,7 @@ REDIS_PORT=6379
+ REDIS_DB=0
+ CACHE_ENABLED=false
+ CACHE_TTL=300
+-CACHE_PREFIX=fastapi_security
++CACHE_PREFIX=yiban
+ 
+ # 自定义安全中间件（默认关闭）
+ MIDDLEWARE_SECURITY_HEADERS_ENABLED=false
+@@ -34,3 +35,6 @@ MIDDLEWARE_RATE_LIMIT_ENABLED=false
+ MIDDLEWARE_AUDIT_ENABLED=false
+ RATE_LIMIT_REQUESTS_PER_MINUTE=60
+ RATE_LIMIT_BURST=20
++
++HOST=127.0.0.1
++PORT=8001
+diff --git a/app/factory.py b/app/factory.py
+index 5ffed3d8d948fb741bf5d3404f52ea47fa37054a..ac73255728a17ae34536641f93afa68a1bb38328 100644
+--- a/app/factory.py
++++ b/app/factory.py
+@@ -1,4 +1,4 @@
+-"""应用工厂：lifespan + 中间件 + 异常 + 路由。"""
++"""译伴基础应用工厂；当前仅装配日志、HTTP 与路由。"""
+ 
+ from contextlib import asynccontextmanager
+ from typing import AsyncGenerator
+@@ -6,55 +6,37 @@ from typing import AsyncGenerator
+ from fastapi import FastAPI
+ from fastapi.middleware.trustedhost import TrustedHostMiddleware
+ 
++from api import register_routers
+ from config import settings
+-from utils.logger import setup_logging, get_logger
++from utils.logger import get_logger, setup_logging
++
+ from .config import AppConfig
+-from .middleware import setup_middleware
+ from .exceptions import setup_exception_handlers
++from .middleware import setup_middleware
+ from .routes import setup_routes
+-from api import register_routers
+-from core.database import create_database_pool, close_database_pool
+-from core.cache import init_cache, close_cache
+-from core.queue import start_queue, stop_queue
+ 
+ logger = get_logger(__name__)
+ 
+ 
+ @asynccontextmanager
+ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+-    """日志 → DB → 缓存 → 队列。HTTPS/TLS 由反向代理负责，此处不强制跳转。"""
+-    logger.info("正在启动应用...")
++    """基础工程不连接数据库、Redis 或启动任务队列。
++
++    模板的基础设施模块保留供后续适配，不把课堂内存队列当成真实后台任务。
++    """
++    setup_logging(level=settings.log_level)
++    logger.info("译伴基础工程启动；业务基础设施尚未接入")
+     try:
+-        setup_logging(level=getattr(settings, "log_level", "INFO"))
+-        await create_database_pool()
+-        await init_cache()
+-        await start_queue()
+-        logger.info("应用启动成功 - 环境: %s", settings.environment)
+         yield
+-    except Exception as e:
+-        logger.error("应用启动失败: %s", e)
+-        raise
+     finally:
+-        logger.info("正在关闭应用资源...")
+-        try:
+-            await stop_queue()
+-            await close_cache()
+-            await close_database_pool()
+-            logger.info("应用已安全关闭")
+-        except Exception as e:
+-            logger.error("关闭资源时出错: %s", e)
++        logger.info("译伴基础工程关闭")
+ 
+ 
+ def create_app() -> FastAPI:
++    """创建基础应用，真实业务按后续批次注册。"""
+     app = FastAPI(**AppConfig.get_app_config(), lifespan=lifespan)
+-
+-    # 非 debug 时限制 Host（Docker/本地可在 .env 配置 ALLOWED_HOSTS）
+     if not settings.debug:
+-        app.add_middleware(
+-            TrustedHostMiddleware,
+-            allowed_hosts=getattr(settings, "allowed_hosts", ["*"]),
+-        )
+-
++        app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.allowed_hosts)
+     setup_middleware(app)
+     setup_exception_handlers(app)
+     setup_routes(app)
+diff --git a/app/routes.py b/app/routes.py
+index 2d10e903b773617e324481de5f3321e954e9e63e..0e13ce7b6656ab53c8dae77b8c134a091e16aa29 100644
+--- a/app/routes.py
++++ b/app/routes.py
+@@ -1,4 +1,4 @@
+-"""基础路由配置"""
++"""基础状态路由；健康响应不代表业务或数据库就绪。"""
+ 
+ from fastapi import FastAPI
+ 
+@@ -6,31 +6,12 @@ from config import settings
+ 
+ 
+ def setup_routes(app: FastAPI) -> None:
+-    """设置基础路由
+-    
+-    Args:
+-        app: FastAPI应用实例
+-    """
+-    
+-    @app.get("/health", include_in_schema=False)
+-    async def health_check():
+-        """健康检查接口
+-        
+-        Returns:
+-            dict: 健康状态信息
+-        """
++    @app.get("/health", tags=["基础状态"])
++    async def health_check() -> dict:
+         return {
+-            "status": "ok", 
+-            "version": settings.api_version,
+-            "service": "FastAPI安全项目"
++            "status": "ok",
++            "service": settings.project_name,
++            "version": settings.project_version,
++            "mode": "bootstrap",
++            "business_ready": False,
+         }
+-    
+-    @app.get("/api/info", include_in_schema=settings.debug)
+-    async def api_info():
+-        """API路由信息接口（仅在调试模式下可用）
+-        
+-        Returns:
+-            dict: 路由信息
+-        """
+-        from api import get_router_info
+-        return get_router_info()
+diff --git a/config/config_unified.py b/config/config_unified.py
+index 5c6cef70a7a61c68d841d66b021d116a1ca2fd22..0a5e6a563065829b497236c35be42ab6bfc8d714 100644
+--- a/config/config_unified.py
++++ b/config/config_unified.py
+@@ -41,8 +41,8 @@ class BaseConfig(BaseSettings):
+     # 环境和项目基础信息
+     # =================================================================
+     environment: Environment = Environment.DEVELOPMENT
+-    project_name: str = "FastAPI Security Demo"
+-    project_version: str = "1.0.0"
++    project_name: str = "yiban-api"
++    project_version: str = "0.1.0"
+     api_version: str = "v1"
+     api_prefix: str = "/api/v1"
+     
+@@ -102,8 +102,8 @@ class BaseConfig(BaseSettings):
+     timezone: str = "Asia/Shanghai"
+     
+     # 服务器配置
+-    host: str = "0.0.0.0"
+-    port: int = 8000
++    host: str = "127.0.0.1"
++    port: int = 8001
+     workers: int = 1
+     
+     # =================================================================
+diff --git a/core/__init__.py b/core/__init__.py
+index 60d5b9510c70b4752b88fbdf62caf5bed3cf8d64..8f4391c05354a4b3973a0c88239c81250d200cf9 100644
+--- a/core/__init__.py
++++ b/core/__init__.py
+@@ -3,7 +3,7 @@
+ 分层约定：
+ - database / cache / queue：运行时基础设施（lifespan 初始化）
+ - security：密码 / JWT 薄封装（实现在 utils）
+-- permissions：业务认证与授权 Depends（SsoUser）
++- permissions：鉴权尚未接入时默认拒绝的占位 Depends
+ - 服务工厂：``service.dependencies``（勿再放 core）
+ 
+ 推荐显式导入，例如::
+diff --git a/core/permissions.py b/core/permissions.py
+index 5e40fb965c3df9298817c75bc83e6ac3f91044bf..aacec0753086327db851c3d54788ac10af0f7446 100644
+--- a/core/permissions.py
++++ b/core/permissions.py
+@@ -1,159 +1,42 @@
+-"""业务认证 / 授权依赖（依赖 SsoUser，不属于通用 utils）
++"""鉴权占位依赖：真实账号体系尚未接入，所有权限入口默认拒绝。
+ 
+-统一入口：
+-- get_current_sso_user / get_current_user：验 JWT 后从 DB 加载活跃用户
+-- get_current_active_user / require_admin|teacher|student：授权链
+-
+-JWT 纯函数在 utils.auth；本模块只做 FastAPI Depends + 业务表查询。
++保留模板导入名以便基础包装配；不创建学校 SsoUser，不接受模拟登录标记。
+ """
+ 
+-from fastapi import Depends
+-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+-from sqlalchemy import select
+-from sqlalchemy.ext.asyncio import AsyncSession
++from typing import Any, NoReturn
++
++from fastapi import HTTPException
++
+ 
+-from core.database import get_async_session
+-from models.sso_user import SsoUser
+-from utils.auth import jwt_authenticator
+-from utils.custom_exceptions import AuthenticationException, AuthorizationException
+-from utils.logger import log_security_event
++async def get_current_user() -> NoReturn:
++    """鉴权未实现，明确返回服务尚不可用。"""
++    raise HTTPException(status_code=503, detail="账号与权限服务尚未接入")
+ 
+-security = HTTPBearer()
++
++# 仅保持模板导入兼容；这些别名都执行同一个默认拒绝的依赖。
++get_current_sso_user = get_current_user
++get_current_active_user = get_current_user
++require_admin = get_current_user
++require_teacher = get_current_user
++require_student = get_current_user
+ 
+ 
+ class PermissionChecker:
+-    """权限检查器（业务规则）"""
++    """占位检查器不授予任何角色或资源访问权限。"""
+ 
+     @staticmethod
+-    def check_user_access_to_resource(
+-        current_user: SsoUser,
+-        resource_owner_id: str,
+-        resource_type: str = "general",
+-    ) -> bool:
+-        if current_user.user_type == 3:
+-            return True
+-        if current_user.user_id == resource_owner_id:
+-            return True
+-        log_security_event(
+-            "UNAUTHORIZED_RESOURCE_ACCESS",
+-            user_id=current_user.user_id,
+-            details={
+-                "resource_owner": resource_owner_id,
+-                "resource_type": resource_type,
+-                "user_type": current_user.user_type_name,
+-            },
+-        )
++    def check_user_access_to_resource(*args: Any, **kwargs: Any) -> bool:
+         return False
+ 
+     @staticmethod
+-    def check_admin_permission(current_user: SsoUser) -> bool:
+-        if current_user.user_type != 3:
+-            log_security_event(
+-                "ADMIN_PERMISSION_DENIED",
+-                user_id=current_user.user_id,
+-                details={"user_type": current_user.user_type_name},
+-            )
+-            return False
+-        return True
++    def check_admin_permission(*args: Any, **kwargs: Any) -> bool:
++        return False
+ 
+     @staticmethod
+-    def check_teacher_permission(current_user: SsoUser) -> bool:
+-        if current_user.user_type not in (2, 3):
+-            log_security_event(
+-                "TEACHER_PERMISSION_DENIED",
+-                user_id=current_user.user_id,
+-                details={"user_type": current_user.user_type_name},
+-            )
+-            return False
+-        return True
+-
+-
+-async def get_current_sso_user(
+-    credentials: HTTPAuthorizationCredentials = Depends(security),
+-    db: AsyncSession = Depends(get_async_session),
+-) -> SsoUser:
+-    """从 Bearer Token 加载活跃 SsoUser（业务认证依赖）。"""
+-    try:
+-        payload = jwt_authenticator.verify_token(credentials.credentials)
+-        user_id = payload.get("sub")
+-        if user_id is None:
+-            raise AuthenticationException("令牌中缺少用户信息")
+-
+-        user = await db.scalar(
+-            select(SsoUser).where(
+-                SsoUser.user_id == str(user_id),
+-                SsoUser.status == 1,
+-            )
+-        )
+-        if user is None:
+-            log_security_event("USER_NOT_FOUND_IN_TOKEN", user_id=str(user_id))
+-            raise AuthenticationException("用户不存在")
+-        if not user.is_active:
+-            log_security_event(
+-                "INACTIVE_USER_ACCESS",
+-                user_id=str(user_id),
+-                details={"status": user.status},
+-            )
+-            raise AuthenticationException("用户账号已被禁用")
+-        return user
+-    except AuthenticationException:
+-        raise
+-    except Exception as exc:
+-        log_security_event("AUTHENTICATION_ERROR", details={"error": str(exc)})
+-        raise AuthenticationException("身份验证失败") from exc
+-
+-
+-# 统一别名：业务路由请依赖本符号，勿再用 core.security.get_current_user
+-get_current_user = get_current_sso_user
+-
+-
+-async def get_current_active_user(
+-    current_user: SsoUser = Depends(get_current_sso_user),
+-) -> SsoUser:
+-    if not current_user.is_active:
+-        raise AuthenticationException("用户账号已被禁用")
+-    return current_user
+-
+-
+-async def require_admin(
+-    current_user: SsoUser = Depends(get_current_active_user),
+-) -> SsoUser:
+-    if not PermissionChecker.check_admin_permission(current_user):
+-        raise AuthorizationException("需要管理员权限")
+-    return current_user
+-
+-
+-async def require_teacher(
+-    current_user: SsoUser = Depends(get_current_active_user),
+-) -> SsoUser:
+-    if not PermissionChecker.check_teacher_permission(current_user):
+-        raise AuthorizationException("需要教师权限")
+-    return current_user
+-
+-
+-async def require_student(
+-    current_user: SsoUser = Depends(get_current_active_user),
+-) -> SsoUser:
+-    if current_user.user_type not in (1, 3):
+-        log_security_event(
+-            "STUDENT_PERMISSION_DENIED",
+-            user_id=current_user.user_id,
+-            details={"user_type": current_user.user_type_name},
+-        )
+-        raise AuthorizationException("需要学生权限")
+-    return current_user
++    def check_teacher_permission(*args: Any, **kwargs: Any) -> bool:
++        return False
+ 
+ 
+ def check_resource_ownership(resource_owner_id: str, resource_type: str = "general"):
+-    """返回校验资源归属的 Depends 可调用对象。"""
+-
+-    async def _dependency(
+-        current_user: SsoUser = Depends(get_current_active_user),
+-    ) -> SsoUser:
+-        if not PermissionChecker.check_user_access_to_resource(
+-            current_user, resource_owner_id, resource_type
+-        ):
+-            raise AuthorizationException("您无权访问此资源")
+-        return current_user
+-
+-    return _dependency
++    """属主校验未接入时，同样返回默认拒绝的依赖。"""
++    return get_current_user
+diff --git a/docker/Dockerfile b/docker/Dockerfile
+index 2412bce900233636302107b228a3154060451d68..56164ef51f127d562ae1dc3bdd7bb3afa2f04304 100644
+--- a/docker/Dockerfile
++++ b/docker/Dockerfile
+@@ -4,7 +4,7 @@
+ # 或配合 compose:
+ #   docker compose -f docker/docker-compose.yml up --build
+ 
+-FROM python:3.11-slim AS builder
++FROM python:3.12-slim AS builder
+ 
+ ENV PYTHONDONTWRITEBYTECODE=1 \
+     PYTHONUNBUFFERED=1 \
+@@ -24,7 +24,7 @@ RUN python -m venv /opt/venv \
+     && /opt/venv/bin/pip install -r requirements.txt
+ 
+ 
+-FROM python:3.11-slim AS runtime
++FROM python:3.12-slim AS runtime
+ 
+ ENV PYTHONDONTWRITEBYTECODE=1 \
+     PYTHONUNBUFFERED=1 \
+diff --git a/docker/docker-compose.yml b/docker/docker-compose.yml
+index 1d2938148b79fe651d021eb0481dcb58e7b5f7cc..74b3b1f9a2903d107d65bb3a3ab13fe336c486ff 100644
+--- a/docker/docker-compose.yml
++++ b/docker/docker-compose.yml
+@@ -33,7 +33,8 @@ services:
+       - "${MYSQL_PORT:-3306}:3306"
+     volumes:
+       - mysql_data:/var/lib/mysql
+-      - ../database/api_security_demo-20260717.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
++      # 尚未设计业务 DDL，不挂载教师示例数据库初始化脚本。
++      # - ../database/<reviewed-init-script>.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+     command:
+       - --character-set-server=utf8mb4
+       - --collation-server=utf8mb4_unicode_ci
+diff --git a/pyproject.toml b/pyproject.toml
+index a59598884b7a2714cbed624db5b73bf495c7f6ea..cc963b596f2befc6356a81d80658c27ce71af5f1 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -2,15 +2,15 @@
+ # 包管理与启动推荐使用 uv（https://github.com/astral-sh/uv）
+ #
+ # 占位符（生成时替换）：
+-#   {{project_name}}         — 项目名（PEP 503：建议用连字符，如 fastapi_project_starter）
+-#   {{project_description}}  — 项目描述
++#   yiban-api         — 项目名（PEP 503：建议用连字符，如 fastapi_project_starter）
++#   译伴双语电子书生成系统共享后端起步工程  — 项目描述
+ 
+ [project]
+-name = "{{project_name}}"
+-version = "1.0.0"
+-description = "{{project_description}}"
++name = "yiban-api"
++version = "0.1.0"
++description = "译伴双语电子书生成系统共享后端起步工程"
+ readme = "README.md"
+-requires-python = ">=3.10"
++requires-python = ">=3.12,<3.13"
+ dependencies = [
+     "fastapi>=0.115.0",
+     "uvicorn[standard]>=0.23.0",
+diff --git a/requirements.txt b/requirements.txt
+index 1210a14285fbed4f2217e1b1715c9e08a8129645..dadc8ca50a187ce5bb527197389a27e810ee7b16 100644
+--- a/requirements.txt
++++ b/requirements.txt
+@@ -1,33 +1,82 @@
+-# =============================================================================
+-# FastAPI 企业起步依赖（与 starter requirements 对齐，可按环境裁剪）
+-# 安装：pip install -r requirements.txt
+-# =============================================================================
+-
+-fastapi==0.115.6
+-uvicorn[standard]==0.34.0
+-pydantic>=2.12.0
+-pydantic-settings>=2.7.0
+-python-multipart==0.0.20
+-email-validator>=2.2.0
+-
+-sqlalchemy[asyncio]==2.0.34
+-alembic==1.13.3
+-aiosqlite==0.20.0
+-aiomysql==0.2.0
+-
+-PyJWT==2.8.0
+-passlib[bcrypt]==1.7.4
+-bcrypt>=4.2.1
+-cryptography>=44.0.0
+-
+-redis==5.2.1
+-
+-python-dotenv==0.21.0
+-PyYAML==6.0.1
+-tenacity==8.2.3
+-python-json-logger==2.0.7
+-
+-pytest==8.3.4
+-pytest-asyncio==0.24.0
+-httpx==0.27.0
+-ruff>=0.9.0
++# This file was autogenerated by uv via the following command:
++#    uv export --locked --no-dev --no-hashes --format requirements-txt --no-emit-project --output-file requirements.txt
++aiomysql==0.3.2
++    # via yiban-api
++annotated-doc==0.0.5
++    # via fastapi
++annotated-types==0.8.0
++    # via pydantic
++anyio==4.15.1
++    # via
++    #   starlette
++    #   watchfiles
++bcrypt==5.0.0
++    # via passlib
++click==8.5.0
++    # via uvicorn
++fastapi==0.159.1
++    # via yiban-api
++greenlet==3.5.6
++    # via yiban-api
++h11==0.16.0
++    # via uvicorn
++httptools==0.9.0
++    # via uvicorn
++idna==3.20
++    # via anyio
++opentelemetry-api==1.45.1
++    # via fastapi
++passlib==1.7.4
++    # via yiban-api
++pydantic==2.14.1
++    # via
++    #   fastapi
++    #   pydantic-settings
++    #   yiban-api
++pydantic-core==2.50.1
++    # via pydantic
++pydantic-settings==2.16.1
++    # via yiban-api
++pyjwt==2.15.1
++    # via yiban-api
++pymysql==1.2.3
++    # via
++    #   aiomysql
++    #   yiban-api
++python-dotenv==1.2.4
++    # via
++    #   pydantic-settings
++    #   uvicorn
++    #   yiban-api
++python-multipart==0.0.32
++    # via yiban-api
++pyyaml==6.0.3
++    # via uvicorn
++sqlalchemy==2.1.6
++    # via yiban-api
++starlette==1.9.0
++    # via fastapi
++typing-extensions==4.16.0
++    # via
++    #   anyio
++    #   fastapi
++    #   opentelemetry-api
++    #   pydantic
++    #   pydantic-core
++    #   pydantic-settings
++    #   sqlalchemy
++    #   starlette
++    #   typing-inspection
++typing-inspection==0.4.4
++    # via
++    #   fastapi
++    #   pydantic
++    #   pydantic-settings
++uvicorn==0.54.0
++    # via yiban-api
++uvloop==0.23.0 ; platform_python_implementation != 'PyPy' and sys_platform != 'cygwin' and sys_platform != 'win32'
++    # via uvicorn
++watchfiles==1.3.0
++    # via uvicorn
++websockets==17.3
++    # via uvicorn
+diff --git a/start.py b/start.py
+index 3ce93845ba366acd03b2b93192db8efff28cab22..9157d670bda3947fb761f53e64d37ea0f039652b 100644
+--- a/start.py
++++ b/start.py
+@@ -1,20 +1,22 @@
+-"""应用入口文件"""
++"""译伴开发入口。"""
+ 
+ import uvicorn
+ 
+-from config import settings
+ from app import create_app
++from config import settings
+ 
+-# 创建应用实例
+ app = create_app()
+ 
+ 
+-
+-if __name__ == "__main__":
++def main() -> None:
+     uvicorn.run(
+         "start:app",
+-        host="0.0.0.0",
+-        port=8000,
++        host=settings.host,
++        port=settings.port,
+         reload=settings.debug,
+-        log_level=settings.log_level.lower()
++        log_level=settings.log_level.lower(),
+     )
++
++
++if __name__ == "__main__":
++    main()

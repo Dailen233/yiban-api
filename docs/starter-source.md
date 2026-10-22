@@ -1,0 +1,69 @@
+# 后端起步来源与初始化记录
+
+日期：2026-10-22。本记录区分教师原始生成模板、译伴初始化适配和已验证能力。
+
+## 来源
+
+| 项目 | 记录 |
+|---|---|
+| 教师仓库 | https://gitee.com/ncepu-bj/ncepu_ideal-skills |
+| 已核对压缩包 | `ncepu_ideal-skills-develop.zip` |
+| SHA-256 | `a5a4ee0d4d4108f734f8b7308005eb33ba816d4725527c2b968f51005d225620` |
+| 用户本机原始包 | `~/下载/ncepu_ideal-skills-develop.zip`，用户已验证散列一致 |
+| 起步模板 | `ncepu_ideal-skills-develop/sql-to-fastapi-restfulapi-scaffold/resources/templates/project_structure/` |
+| 模板原始文件数 | 65，其中 Python 文件 42 |
+| 使用方式 | 完整复制基础结构，再做以下初始化适配；未按 SQL 生成业务表与 CRUD |
+
+这是根据教师资源生成的项目实例，首次提交不是教师上游 Git 提交。原始 ZIP、目录和逐文件散列用于追溯，不能把本仓的提交号冒充上游版本。
+
+逐文件原始散列、初始化后散列和修改状态见 [starter-manifest.json](starter-manifest.json)。[starter-adjustments.patch](starter-adjustments.patch) 只记录对原有模板文件的改动，新增说明、测试、锁文件等另列在清单中。
+
+## 初始化适配
+
+| 文件 | 改动与原因 |
+|---|---|
+| `pyproject.toml` | 替换生成占位符，命名 yiban-api、版本 0.1.0；本次支持 Python 3.12 系列 |
+| `config/config_unified.py` | 项目名与版本；本机默认绑定 127.0.0.1:8001 |
+| `.env.example` | 项目、缓存前缀和本机端口；示例 CORS 包含用户端 5173 与管理端 8888；数据库等字段标为后续参考 |
+| `app/factory.py` | 基础生命周期只启用日志，不自动连接模板 MySQL、Redis或启动内存队列 |
+| `app/routes.py` | 健康检查明确 bootstrap、business_ready=false；移除依赖不存在辅助函数的模板 /api/info |
+| `core/permissions.py` | 移除对未生成学校 SsoUser 的依赖；兼容导入名均默认拒绝，HTTP 503，不授予角色或属主访问 |
+| `core/__init__.py` | 同步权限占位说明，保留导入兼容 |
+| `start.py` | 使用统一配置和 main 入口，默认本机 8001；不硬编码公开监听 |
+| `requirements.txt` | 从 uv.lock 导出运行时依赖，解决原模板 pip 清单与 pyproject 不一致 |
+| `docker/Dockerfile` | Python 基础镜像声明与本次 3.12 支持范围一致，未构建镜像 |
+| `docker/docker-compose.yml` | 注释不存在的学校 SQL dump 挂载，不生成业务初始化 SQL |
+
+新增 README、CODEBUDDY、Git/Docker 忽略规则、uv.lock、基础测试和来源资料。其余模板文件保留原文；格式历史不作为已完成全面规范化的声明。
+
+## 依赖与运行环境
+
+以 `pyproject.toml` 为主清单，`uv.lock` 锁定来自公开 PyPI 的解析结果。主要版本：FastAPI 0.159.1、Uvicorn 0.54.0、Pydantic 2.14.1、pydantic-settings 2.16.1、SQLAlchemy 2.1.6、pytest 9.1.1。它们是本次锁定值，不表述为教师指定版本或“当前最新版”。
+
+`requirements.txt` 由以下命令生成，更新依赖后保持同步：
+
+```bash
+uv export --locked --no-dev --no-hashes --format requirements-txt --no-emit-project --output-file requirements.txt
+```
+
+准备环境使用 CPython 3.12.14、uv 0.12.23。用户本机是 Python 3.12.3、uv 0.13.0，本机尚需按 README 复验；不把准备环境结果冒充用户本机结果。
+
+## 实际验证
+
+| 检查 | 结果 |
+|---|---|
+| 原始压缩包散列 | 与用户本机提供的 SHA-256 一致 |
+| Python 语法 | 初始化后的 44 个 Python 文件通过 AST 解析 |
+| 安装与锁定 | uv 解析 41 个包并成功安装当前环境所需的 39 个包，生成 uv.lock |
+| 测试 | `uv run --locked pytest -q`：6 passed，1 条上游测试客户端弃用提示 |
+| 无基础设施启动 | 生命周期测试通过，不初始化 DB、缓存、队列 |
+| 权限占位 | 普通/管理员依赖，无凭据或任意 Bearer 均返回 503，受保护处理不执行 |
+| 真实 HTTP | 测试启动独立 Uvicorn，/health 和 /openapi.json 可读，进程自动清理 |
+
+该弃用提示来自 Starlette TestClient 当前对 httpx 的兼容路径，不是功能失败；本批未屏蔽提示。测试没有验证真实登录、JWT 业务会话、多用户属主、翻译、数据库事务或导出，也没有运行 Docker、部署或业务迁移。
+
+## 首次提交与后续
+
+本包不附 `.git/`，也不虚构尚未产生的首次提交号。在用户本机验收后，以上初始化实例作为首个代码提交推送到两平台的 master、develop；根提交可用 `git rev-list --max-parents=0 HEAD` 查询。后续业务按独立功能分支推进。
+
+未定的物理数据库、持久任务机制、文件存储和真实会话按设计阶段落实。教师的工具、部署模板及教学角色不自动成为译伴的最终方案。
