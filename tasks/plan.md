@@ -1,6 +1,6 @@
 # 账号基础落地方案
 
-> 状态：**待评审**。本文为账号模块（注册/登录/角色/会话）的基础落地规划，不包含上传、翻译、任务、书库等后续链路。范围以需求 §3.5「首个真实可运行里程碑」中的账号项 + FR-14/15 + G11 为依据。
+> 状态：**已实施**（任务 1—4 于 2026-10-23 完成，见 `tasks/todo.md`）。本文为账号模块（注册/登录/角色/会话）的落地规划，不包含上传、翻译、任务、书库等后续链路。范围以需求 §3.5「首个真实可运行里程碑」中的账号项 + FR-14/15 + G11 为依据。
 >
 > 本文所有「推荐」均为**本项目拟定**，供评审；不是「老师要求」，也不等于「用户已确认」。涉及待确认的产品项（P12 等）明确标注状态。
 
@@ -17,7 +17,10 @@
 - G11：记录归属到用户、服务端权限校验、管理员独立角色与入口。
 - 数据库逻辑模型 §3.1 `user`、§4.3 属主一致性（冗余 `owner_id` + 服务端强制，非靠物理外键保证）。
 
-### 1.3 当前代码现状（决定复用/替换）
+### 1.3 规划时点代码现状（历史快照，非当前事实）
+
+> 本节为规划撰写时（2026-10，实施前）的代码快照，仅保留作历史依据；部分内容已在任务 1—4 中被替换或实现，不代表当前代码事实。当前实现以 `core/token.py`（固定 HS256 会话 JWT）、`core/permissions.py`（真实鉴权）为准；`utils/auth.py` 与 `core/security.py` 已在账号收口批次删除。
+
 - `core/database.py`：纯异步 `AsyncEngine` + `async_sessionmaker`，`get_async_session` 依赖注入；`_to_async_url` 已支持 `mysql+pymysql → mysql+aiomysql`。
 - `models/base.py`：`BaseModel`（仅 `to_dict`/`update_from_dict`，无公共字段）、`TimestampMixin`、`SoftDeleteMixin`。
 - `utils/security.py`：`SecurityUtil.hash_password/verify_password` 直接使用 `bcrypt`（已锁定 bcrypt 5.0.0）。
@@ -71,6 +74,8 @@
 **与逻辑草案的差异**：新增 `user_session`（草案未建模会话，属实现层）；`user` 增加 `updated_at`。首版**不**加 `is_active`/禁用状态（属 M2），**不**一次性生成 upload_file/task/book 等业务表。
 
 ### 2.3 密码与会话
+
+> **实施修正（任务 3—4，与下文规划口径的差异）**：会话 JWT 由 `core/token.py` 固定 HS256 签发/验签，声明为 `sub`/`jti`/`aud`/`exp`，**不含角色快照**，角色一律查库 `user.role` 得出；未复用 `utils/auth.py::JWTAuthenticator`（该模块已删除）。密码哈希复用 `utils/security.SecurityUtil`。下文中「复用 `JWTAuthenticator`」「`role` 快照」为规划时点表述，以本修正为准。
 
 **密码哈希（推荐 bcrypt，复用现有）**：
 - 复用 `utils/security.SecurityUtil.hash_password/verify_password`（bcrypt 5.0.0，`bcrypt.gensalt()` 默认 **cost 12**）。
