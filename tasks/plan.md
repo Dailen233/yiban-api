@@ -30,13 +30,14 @@
 
 ### 2.1 数据库与迁移
 
-**推荐：开发、数据库集成测试、部署统一使用 MySQL 8.0；迁移工具 Alembic；纯逻辑测试不接数据库，SQLite 不作为 MySQL 迁移与约束的验收依据。**
+**推荐：开发、数据库集成测试、部署统一使用 MySQL 8.4 LTS；迁移工具 Alembic；纯逻辑测试不接数据库，SQLite 不作为 MySQL 迁移与约束的验收依据。**
 
-- **统一 MySQL 8.0**：NFR-06 最终云服务器部署，逻辑模型含多表外键与属主一致性；`aiomysql`/`pymysql` 已锁定，`core/database.py` 已支持。开发、数据库集成测试、部署三者用同一引擎，迁移与约束（唯一索引、外键、事务）以 MySQL 实际行为为准。
-- **独立测试库**：数据库集成测试用独立 MySQL 库（如 `yiban_api_test`），与开发库（`yiban_api_dev`）隔离，通过 `DATABASE_URL` 环境变量注入；**不连接其他项目数据库**。纯逻辑测试（校验、哈希、会话撤销规则）用 mock/内存替身，不接数据库。
-- **迁移工具 Alembic**（新增依赖，待批准）：SQLAlchemy 官方迁移，`autogenerate` 生成版本、`upgrade/downgrade` 可回滚。每个迁移版本只引用当时已定义的模型字段，**模型与其迁移在同一批次落地**，避免「迁移引用了后续批次才定义的字段」。
+- **统一 MySQL 8.4 LTS**：依据 MySQL 官方发布模型（https://dev.mysql.com/doc/refman/8.4/en/mysql-releases.html），8.4 是首个 LTS（长期支持）版本（2024-04-30 GA），面向「稳定特性 + 较长支持周期」的场景，适合新项目基线；8.0 已进入仅修复阶段、剩余支持周期短于 8.4 LTS。NFR-06 最终云服务器部署，逻辑模型含多表外键与属主一致性；`aiomysql`/`pymysql` 已锁定，`core/database.py` 已支持。开发、数据库集成测试、部署三者用同一引擎与版本，迁移与约束（唯一索引、外键、事务）以 MySQL 8.4 实际行为为准。**仅调整规划，不安装、升级或操作本机已有数据库。**
+- **数据库启用方式**：未启用数据库时，应用保持 bootstrap「无外部数据库依赖」的现有运行边界；启用后必须使用**显式配置的译伴数据库**（`DATABASE_URL`），**配置缺失或连接失败应明确报错**，不得回退到教师示例库。
+- **迁移工具 Alembic（表结构唯一入口）**（新增依赖，待批准）：SQLAlchemy 官方迁移，`autogenerate` 生成版本、`upgrade/downgrade` 可回滚；**Alembic 是表结构版本与变更的唯一入口**。lifespan **只初始化、释放数据库连接资源，不执行 `create_all` 或自动升级迁移**。每个迁移版本只引用当时已定义的模型字段，**模型与其迁移在同一批次落地**，避免「迁移引用了后续批次才定义的字段」。
+- **测试分层**：① 无需数据库的基础测试（校验、哈希、会话撤销规则、路由语义）用 mock/内存替身，不接数据库；② 迁移/约束/事务测试使用**独立 MySQL 测试库**（如 `yiban_api_test`），与开发库（`yiban_api_dev`）隔离、`DATABASE_URL` 注入，**不连接其他项目数据库**；`upgrade`/`downgrade` 验证**限定在独立测试库**，不对已有开发数据执行回滚验收。
 - **主键**：`id` 用 UUID 字符串（`str(uuid4())`，服务端生成），与逻辑模型 `string id` 一致。
-- **时间语义（UTC）**：一律以 **UTC 存储**（写入时显式 `datetime.now(timezone.utc)`）；读取后的 `datetime` 语义为 UTC；**API 时间统一输出 ISO 8601（带时区偏移，如 `2026-10-23T10:00:00Z`）**；会话过期比较在 UTC 上完成（JWT `exp` 为 Unix 时间戳，比较前统一为 UTC）。`DateTime(timezone=True)` 只是列定义，**不保证 MySQL 驱动的时区一致性**——是否真正存储 aware 时间取决于驱动与服务器时区，需在连接串/迁移中显式约定（如 `mysql+aiomysql://…?init_command=SET time_zone='+00:00'` 或应用层统一 UTC），本方案不把 `timezone=True` 当作时区保障。
+- **时间语义（UTC，收敛约定）**：推荐 MySQL 用 **`DATETIME(6)` 存储不带时区的 UTC 值**；应用**写入前转 UTC**，**读取后恢复 UTC 语义**（按 UTC 解释）；**API 输出带时区的 ISO 8601**（如 `2026-10-23T10:00:00Z`）；**JWT `exp` 与 `session.expires_at` 表示同一到期时刻**（`exp` 为 Unix 时间戳，`expires_at` 为 UTC `DATETIME(6)`，换算到同一 UTC 时刻比较）。本方案已明确「无时区 UTC 列 + 应用层 UTC 约定」，不再保留「设置连接时区或应用层处理」等未选择表述。
 - **email 规范化与唯一性**：入库前 `strip().lower()`（仅对 email，不对密码）；`UNIQUE(email)` 唯一索引防重复注册；校验走 Pydantic `EmailStr`（需 `email-validator`，新增依赖，待批准）或显式正则。
 - **逻辑关联 vs 物理外键**：物理外键只保证「引用存在」，不保证「属主相等」；属主一致性（§4.3 两条不变量）由服务端强制。物理层是否加外键、复合外键或触发器辅助，留数据库物理模型单独评审。
 
@@ -79,7 +80,7 @@
 - **复用边界**：仅复用 `SecurityUtil.hash_password/verify_password`；**不**把同文件中的 `validate_input`/`sanitize_input`（正则黑名单）等工具接入账号流程。
 - **替换**：`passlib` 已 0 处 import，属冗余依赖，列为后续清理（本轮不动 `pyproject.toml`/`uv.lock`）。**新增依赖**：Alembic（迁移）、`email-validator`（若用 `EmailStr`），均待批准。
 
-**会话（JWT + 服务端会话撤销）**：复用 `utils/auth.JWTAuthenticator`（PyJWT 2.15.1，HS256），签发短期 access token（`sub=user_id`、`aud`、`role` 快照、`jti`、`exp`）。**每次鉴权同时验证：① JWT 签名与 `exp`；② `user_session` 记录存在、`expires_at` 未过、`revoked_at IS NULL`；③ `user` 存在且 `role` 与当前校验要求一致**——管理权限**不信任客户端或旧 Token 中的角色快照**，以服务端查 `user.role` 为准。
+**会话（JWT + 服务端会话撤销）**：复用 `utils/auth.JWTAuthenticator`（PyJWT 2.15.1，HS256），签发短期 access token（`sub=user_id`、`aud`、`role` 快照、`jti`、`exp`）。**每次鉴权同时验证：① JWT 签名与 `exp`；② `user_session` 记录存在、`expires_at` 未过、`revoked_at IS NULL`；③ `session.user_id == JWT.sub` 且 `session.jti == JWT.jti`；④ `session.session_type`、JWT `aud` 与当前端点绑定一致；⑤ `user` 存在且 `role` 与当前校验要求一致**——管理权限**不信任客户端或旧 Token 中的角色快照**，以服务端查 `user.role` 为准。
 
 - **过期**：`exp`/`expires_at` 到期 → 401。
 - **退出失效**：`POST /logout` 将对应 `user_session.revoked_at` 置为当前时间，该 `jti` 立即失效（不等 `exp`）。
@@ -92,9 +93,9 @@
 **凭据存储与传输边界**：
 - `password_hash` 只存 bcrypt 哈希；`user_session` 只存 `jti`，不存原始 token；任何响应不返回 `password_hash`。
 - **Cookie**：httpOnly + SameSite=Lax + Secure；**生产** `Secure` 必须开启（HTTPS），**本机开发** http + localhost 下 Secure 按环境豁免。前端 `fetch` 带 `credentials:'include'`，不接触 token——不照搬原型 `localStorage` 模拟鉴权。
-- **CSRF/Origin 校验**：SameSite=Lax 作为 CSRF 主防御；凭据型跨域写操作（如需）加 Origin 校验或 CSRF token。
-- **凭据型 CORS**：`cors_allow_credentials=True` 时 `cors_origins` 必须是**显式 origin 列表**（不得 `*`）。**各环境现状已核对**：`DevelopmentConfig` 为 localhost 列表、`StagingConfig`/`ProductionConfig` 为示例域名列表（这些是显式列表），只有 `BaseConfig` 与未覆盖的 `TestingConfig` 仍是 `cors_origins=["*"]` 且 `credentials=True` 的矛盾组合——需在对应批次把后者改为显式列表，而不是把 `*` 概括成所有环境现状。
-- **HTTPS 与密钥**：生产强制 HTTPS + Secure cookie；**启用真实鉴权时，若 `secret_key` 仍是教学默认值（`dev-secret-key-…`/`test-secret-key-…`/`staging-secret-key-…`）或 `PROD_SECRET_KEY` 未设置，应拒绝启动或显式报错**，不静默用弱密钥签发令牌；`secret_key` 来自环境变量、绝不硬编码或提交。
+- **CSRF/Origin 校验（浏览器 JSON API 推荐规则）**：本项目首版为浏览器 JSON API，写接口（注册、登录、退出及管理端对应写接口）要求**精确匹配可信 Origin**，并携带**固定自定义请求头 `X-Yiban-Request: 1`**；**缺失、`null`、不可信 Origin，或缺少该请求头时拒绝（403）**，本方案**不使用 Referer 兜底**。固定请求头不是登录凭据（仅触发预检、参与 CSRF 防御）；SameSite=Lax 作为补充防护。脚本与测试需显式发送可信 Origin 与该请求头。GET/HEAD 不产生状态变更；OPTIONS 预检正常处理（放行预检、仅校验实际写请求）。
+- **凭据型 CORS**：`cors_allow_credentials=True` 时 `cors_origins` 必须是**精确 origin 白名单**（不得 `*`），并显式允许 `X-Yiban-Request` 请求头。**各环境现状已核对**：`DevelopmentConfig` 为 localhost 列表、`StagingConfig`/`ProductionConfig` 为示例域名列表（这些是显式列表），只有 `BaseConfig` 与未覆盖的 `TestingConfig` 仍是 `cors_origins=["*"]` 且 `credentials=True` 的矛盾组合——需在对应批次把后者改为显式列表，而不是把 `*` 概括成所有环境现状。
+- **HTTPS 与密钥**：生产强制 HTTPS + Secure cookie；**真实签名密钥校验提前到任务 3（任何真实 JWT 签发前生效）**：校验实际使用的 `effective_jwt_secret_key`，**拒绝空值、教学默认值（`dev-secret-key-…`/`test-secret-key-…`/`staging-secret-key-…`）及 `${PROD_SECRET_KEY}` 等占位字符串**——不是只检查 `PROD_SECRET_KEY` 环境变量是否存在，而是校验最终生效的密钥值本身。bootstrap 未启用真实鉴权时保持现有运行边界，不要求提交真实密钥。`secret_key` 来自环境变量、绝不硬编码或提交。
 
 ### 2.4 最小接口契约
 
@@ -133,12 +134,12 @@
 
 见 `tasks/todo.md`，共 4 批（按可验收行为重排）：
 
-1. **MySQL 连接、User 模型及对应迁移基础**：MySQL 连接与独立测试库；`user` 模型 + 首个迁移；时间/email 规范化约定落地。
-2. **注册接口闭环**：注册校验（含密码长度/字节上限）、bcrypt 哈希、落库、重复邮箱 409、服务端固定普通角色。
-3. **用户登录/me/退出、会话与鉴权闭环**：`user_session` + 迁移、JWT 签发校验、退出撤销、`get_current_user` 真实实现、Cookie/CSRF/CORS 配置生效。
-4. **管理员受控创建、独立登录、角色校验与双端会话隔离**：管理员受控创建、`/admin/auth/*`、`require_admin`、双端 `session_type`/`aud`/Cookie 隔离、弱密钥拒绝。
+1. **MySQL 连接、User 模型及对应迁移基础**：MySQL 8.4 LTS 连接与独立测试库；`user` 模型 + 首个迁移；时间/email 规范化约定落地。
+2. **注册接口闭环**：注册校验（含密码长度/字节上限）、bcrypt 哈希、落库、重复邮箱 409、服务端固定普通角色；注册写接口 CSRF/Origin 校验。
+3. **用户登录/me/退出、会话与鉴权闭环**：`user_session` + 迁移、JWT 签发校验、真实密钥校验、退出撤销、`get_current_user` 真实实现、登录/退出 CSRF/Origin、Cookie/CORS 配置生效。
+4. **管理员受控创建、独立登录、角色校验与双端会话隔离**：管理员受控创建、`/admin/auth/*`、`require_admin`、双端 `session_type`/`aud`/Cookie 隔离、管理端写接口 CSRF/Origin 复用。
 
-数据库生命周期（lifespan 建池/建表）在批次 1 生效；Cookie/CSRF/CORS 配置在批次 3 生效，不全部推迟到最后一批。
+数据库连接生命周期（lifespan 仅初始化/释放连接资源）在批次 1 生效；注册写接口 CSRF 在批次 2、登录/退出 CSRF 与真实密钥校验在批次 3、管理端写接口 CSRF 在批次 4，不全部推迟到最后一批。
 
 ## 5. 基线测试待办（首批实施前处理，本轮仅记录）
 
@@ -149,14 +150,14 @@
 
 | 项 | 状态 | 影响 | 建议 |
 |---|---|---|---|
-| MySQL 8.0 统一（开发/集成测试/部署） | 待评审 | 本地需 MySQL 实例 | 独立测试库 + 环境变量注入；SQLite 不作验收依据 |
+| MySQL 8.4 LTS 统一（开发/集成测试/部署） | 待评审 | 本地需 MySQL 8.4 实例 | 独立测试库 + 环境变量注入；SQLite 不作验收依据 |
 | 会话承载 httpOnly cookie vs Bearer | 待评审 | 跨域/CSRF 复杂度 | 推荐双 Cookie + `aud`/`session_type` 绑定 |
 | 密码策略（最小长度/复杂度） | 待评审（P12） | 注册校验 | 建议 ≥8 字符、≤72 字节；具体待定 |
 | 邮箱验证、找回密码 | 建议首版不做（P12/FR-14 待定） | 未实现不得标已验证 | 留后续批次 |
 | 管理员受控创建方式 | 待定 | 无公开注册、无默认密码 | 脚本/CLI 创建，具体待定 |
 | 新依赖（Alembic、email-validator） | 待批准 | 锁文件变更 | 随批次 1/2 引入 |
 | BaseConfig/TestingConfig 的 `cors_origins="*"`+credentials 矛盾 | 需修正 | 凭据型跨域 | 改为显式 origin 白名单 |
-| 生产/测试默认 `secret_key` 弱密钥 | 需拒绝 | 令牌可被伪造 | 启用真实鉴权时校验并拒绝教学默认密钥 |
+| 弱密钥/占位密钥（`effective_jwt_secret_key`） | 需拒绝 | 令牌可被伪造 | 任务 3 起校验并拒绝空值/教学默认值/`${PROD_SECRET_KEY}` 占位符 |
 | 物理外键/主键/复合约束 | 留物理模型单独评审 | 属主一致性不靠 FK | 本方案只承诺服务端强制 |
 
 ## 7. 边界
