@@ -14,7 +14,7 @@
 
 本次来源为教师 Skills 压缩包中的 `sql-to-fastapi-restfulapi-scaffold/resources/templates/project_structure/`。这是基于模板适配的起步工程，来源、原文差异和散列在 docs。当前只有基础 HTTP、日志、OpenAPI 与健康检查；无业务实体、DDL、迁移或真实鉴权。
 
-Python 3.12、uv、FastAPI、Pydantic 2 与 SQLAlchemy 的框架基础沿用起步项目。先按 uv.lock 安装，不因教师 Docker/队列素材存在而预先定案数据库、异步机制或生产架构。业务按用户明确批次推进，不将本次初始化边界当成永久禁令。
+Python 3.12、uv、FastAPI、Pydantic 2 与 SQLAlchemy 的框架基础沿用起步项目。先按 uv.lock 安装，不因教师队列等模板素材存在而预先定案数据库、异步机制或生产架构。业务按用户明确批次推进，不将本次初始化边界当成永久禁令。
 
 默认生命周期不连接数据库、Redis或启动内存队列。健康为 bootstrap 不代表业务或数据就绪。权限占位依赖默认拒绝；不得将其改为无条件通过、接受固定测试 Token 或使用 localStorage 标记充当真实权限。
 
@@ -41,4 +41,4 @@ Gitee origin 为 PR 合并入口，GitHub github 镜像相同提交。master 稳
 
 验证使用 `uv sync --locked` 与 `uv run --locked pytest -q`。测试覆盖基础生命周期、默认拒绝与真实 Uvicorn HTTP；不表述为真实鉴权或业务验收。仅改 Markdown 时检查差异和来源即可，不重复构建。依赖、配置或启动改动运行对应检查；继承的未验收模块按功能逐步验证。
 
-汇报修改文件、行为、实际检查、限制，以及提交、推送、合并、部署的真实状态。模板中的 docker/deploy 为参考，未授权时不启动新服务、连接现有项目数据库或执行初始化 SQL。
+汇报修改文件、行为、实际检查、限制，以及提交、推送、合并、部署的真实状态。起步附带的容器/运维教学素材已裁剪移除；未授权时不启动新服务、连接现有项目数据库或执行初始化 SQL。
