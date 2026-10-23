@@ -4,11 +4,11 @@
 
 ## 当前状态
 
-本批只完成起步工程初始化：应用工厂、配置、日志、健康检查、OpenAPI 和最小验收测试。唯一业务以外的显式路由是 `GET /health`，另保留 FastAPI 文档入口。账号、用户属主、上传、解析、翻译、任务、书库和导出尚未实现。
+起步工程初始化已完成（应用工厂、配置、日志、健康检查、OpenAPI 和最小验收测试），并落地账号数据库基础（`user` 模型 + Alembic 首个迁移，数据库默认关闭）。唯一业务以外的显式路由是 `GET /health`，另保留 FastAPI 文档入口。注册/登录、用户属主、上传、解析、翻译、任务、书库和导出尚未实现。
 
 初始化时复制教师的 65 个基础模板文件，再完成项目元数据、启动和权限占位适配。不是教师模板原样导入；差异和逐文件散列见 [来源记录](docs/starter-source.md) 与 [来源清单](docs/starter-manifest.json)。
 
-默认启动仅初始化日志，不连接 MySQL、Redis，也不启动教学内存队列。`/health` 的 `status=ok` 只证明基础 HTTP 进程可用；`mode=bootstrap`、`business_ready=false` 明确表示尚未业务就绪。真实后台任务机制、数据库与存储仍按后续设计落实。
+数据库默认关闭（`DATABASE_ENABLED=false`），bootstrap 仅初始化日志，不连接 MySQL、Redis，也不启动教学内存队列；启用数据库须显式配置译伴 `DATABASE_URL`，表结构由 Alembic 唯一管理（lifespan 不执行 `create_all` 或自动迁移）。`/health` 的 `status=ok` 只证明基础 HTTP 进程可用；`mode=bootstrap`、`business_ready=false` 明确表示尚未业务就绪。真实后台任务机制、存储仍按后续设计落实。
 
 ## 快速开始
 
@@ -44,7 +44,7 @@ curl --noproxy '*' http://127.0.0.1:8001/health
 | `config/` | 教师的统一配置与环境工厂；标准入口为 `from config import settings` |
 | `api/v1/` | 后续请求与响应入口；当前尚未注册业务资源 |
 | `service/` | 后续业务流程、校验、计数和事务边界，当前仅模板骨架 |
-| `repository/`、`models/`、`schemas/` | 数据访问、ORM 和 Schema 基础，尚无译伴业务实体 |
+| `repository/`、`models/`、`schemas/` | 数据访问、ORM 和 Schema 基础；`models/user.py` 已有账号实体，`repository/` 尚无业务仓储 |
 | `core/` | 数据库、缓存、队列模板及默认拒绝的权限占位依赖 |
 | `utils/`、`middleware/` | 继承的工具与可选中间件；并不等于所有模板能力已验收 |
 | `tests/` | 无外部基础设施启动、权限占位拒绝及真实 HTTP 启动验收 |
@@ -65,10 +65,30 @@ curl --noproxy '*' http://127.0.0.1:8001/health
 
 起步阶段附带的容器与运维素材（`docker/`、`deploy/`）已作为教学参考裁剪移除，不再随仓库保留；来源与删除记录见 [来源记录](docs/starter-source.md)。后续部署方案按项目设计阶段确定，云服务器部署目标（G1）保留不变；本批未启动任何容器或运维服务。
 
+### 本地 MySQL 8.4 测试实例（数据库集成验收用）
+
+数据库集成测试需要译伴专用 MySQL 8.4 实例（独立测试库 `yiban_api_test`，仅本机监听，开发/测试隔离）。本机 Docker 需 root 权限时，由你在终端输入 sudo 密码启动（命令与文档均不含密码）：
+
+1. 生成随机凭据到被 Git 忽略的 `.env.test-db`：
+   ```bash
+   python -c "import secrets; print('MYSQL_ROOT_PASSWORD='+secrets.token_urlsafe(24)); print('MYSQL_DATABASE=yiban_api_test'); print('MYSQL_USER=yiban'); print('MYSQL_PASSWORD='+secrets.token_urlsafe(24)); print('MYSQL_PORT=3308')" > .env.test-db
+   ```
+2. 启动容器（使用 `--env-file`，密码不写入命令）：
+   ```bash
+   sudo docker compose --env-file .env.test-db -f docker-compose.mysql.yml up -d
+   ```
+   容器名 `yiban-mysql-84-test`、卷 `yiban_mysql_test_data`、端口 `127.0.0.1:3308`。
+3. 连接验证（用 `.env.test-db` 中的 `yiban` 用户密码）：
+   ```bash
+   TEST_DATABASE_URL='mysql+pymysql://yiban:<password>@127.0.0.1:3308/yiban_api_test' \
+   uv run --locked pytest -q tests/test_account_db_integration.py
+   ```
+   集成测试只读 `TEST_DATABASE_URL` 并校验目标库名必须为 `yiban_api_test`，非译伴专用测试库会拒绝执行迁移/写入。
+
 ## Git 与后续范围
 
 仓库与前端同级放置，使用 `master` 稳定分支、`develop` 集成分支以及 `feature/*`、`fix/*`、`docs/*`。Gitee 为 `origin` 和 PR 合并入口，GitHub 为 `github` 镜像，同步相同提交；校内 GitLab 留到最终提交阶段。保留起步根提交，不在两平台各自合并同一变更。
 
 首个真实里程碑按中央需求 §3.5 推进：注册登录、TXT、英语到中文、真实翻译、后台进度、预览、EPUB、个人书库与重新下载，以及最小只读管理查看。状态、失败、幂等入库、重试新建 task 与属主规则按已有设计草案落实，当前均尚未实现。
 
-详见 [CODEBUDDY.md](CODEBUDDY.md)。本批没有业务表、DDL、迁移或通用业务 CRUD，不将工程初始化等同于完成核心链路。
+详见 [CODEBUDDY.md](CODEBUDDY.md)。已落地 `user` 表与首个 Alembic 迁移（账号数据库基础，数据库默认关闭）；通用业务 CRUD、注册/登录、鉴权与业务链路仍未实现，不将工程初始化等同于完成核心链路。

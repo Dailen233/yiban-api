@@ -8,13 +8,15 @@
 **Description**：接入 MySQL 8.4 LTS 连接与 Alembic（表结构唯一入口）；建立 `user` 表首个迁移（email UK、`DATETIME(6)` 无时区 UTC 约定）；lifespan **只初始化/释放连接资源，不 `create_all`、不自动迁移**；开发库与独立集成测试库隔离（`DATABASE_URL` 注入，不连接其他项目数据库，配置缺失/连接失败明确报错、不回退教师示例库）；处理基线测试的 `ALLOWED_HOSTS` 依赖（见下）。
 
 **Acceptance criteria:**
-- [ ] `user`（id/email UK/password_hash/display_name/role/created_at/updated_at）迁移可 `upgrade`/`downgrade`；email 唯一与规范化（strip+lower）约定落库；时间列 `DATETIME(6)` 存无时区 UTC，写入前转 UTC、读取后恢复 UTC 语义。
-- [ ] 时间往返测试通过（写 UTC → 读回 UTC 语义一致）。
-- [ ] 开发库与集成测试库由 `DATABASE_URL` 隔离，纯逻辑测试不接数据库；`upgrade`/`downgrade` 验收限定独立测试库；基线测试 `tests/test_production_config.py` 子进程显式 `ALLOWED_HOSTS=localhost,127.0.0.1`，不依赖私有 `.env`。
+- [x] `user` 模型与首个迁移脚本落地：`email` UNIQUE、`DATETIME(6)` 无时区 UTC、UUID 主键、`role` 默认 `'user'`；`UTCDateTime` 列类型绑定实现写入前转 UTC、读回恢复 UTC 语义（编译为 `DATETIME(6)`）；离线 SQL 验证通过（`DEFAULT 'user'`、`UNIQUE(email)`、`DATETIME(6)`）。
+- [x] 测试库保护：集成测试只读 `TEST_DATABASE_URL`（不回退 `DATABASE_URL`）、`ensure_test_database` 限定目标库名 `yiban_api_test`（结构化 `make_url` 解析，非子串判断），缺失跳过、非法报错；新增无需数据库的保护测试证明开发库/教师库/其他库/非法 URL 在迁移/写入前被拒绝；连接失败时引擎释放、全局状态不残留。
+- [x] 真实 MySQL 8.4（8.4.13）上的 `upgrade`→`downgrade`→`upgrade` 与持久化、规范化 email 唯一约束、事务回滚、UTC 时间往返（含非 UTC 偏移 + 微秒）验收，四项集成测试均真实执行通过。
+- [x] 基线测试 `tests/test_production_config.py` 子进程显式 `ALLOWED_HOSTS`（JSON 数组）与 `DATABASE_ENABLED=false`，不依赖私有 `.env`；数据库默认关闭、启用时配置缺失或教师示例库按库名结构化拒绝；lifespan 仅初始化/释放连接资源，不 `create_all`、不自动迁移。
 
 **Verification:**
-- `uv run alembic upgrade head` + `alembic downgrade -1`（仅独立测试库）。
-- `uv run --locked pytest -q`（含基线测试修正后全绿）。
+- [x] `uv run alembic upgrade head --sql`（离线生成 SQL，验证迁移脚本）。
+- [x] 带 `TEST_DATABASE_URL` 的完整回归 `DEBUG=release uv run --locked pytest -q`：40 passed、0 skipped（基础 36 + 集成 4）。
+- [x] `uv run alembic upgrade head` + `downgrade -1`（仅独立测试库 `yiban_api_test`）。
 
 **Dependencies:** None
 
