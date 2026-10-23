@@ -59,6 +59,7 @@ curl --noproxy '*' http://127.0.0.1:8001/health
 - `core.permissions` 保留必要导入名称，但权限依赖统一返回 HTTP 503，检查器不授予权限。兼容名称中的 `sso/teacher/student` 不代表译伴采用学校账号模型；真实实现须按 user、角色、属主与管理内容访问边界重写。
 - 教师密码/JWT、缓存、队列、部署与其他工具模块仍需后续专门验收；不能据文件存在声称业务或生产能力已完成。
 - 选择配置环境使用进程变量 `FASTAPI_ENV`，本次默认 development。真实数据库、角色、服务密钥及运行策略在对应里程碑接入，前端不保存服务端秘密。
+- 调试开关使用专用环境变量 `YIBAN_DEBUG`（`true`/`false`），不再读取通用 `DEBUG`；旧的 `DEBUG` 配置项需迁移为 `YIBAN_DEBUG`。
 
 ## 部署
 

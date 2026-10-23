@@ -1,7 +1,7 @@
 """统一配置模块 - 包含所有环境的配置类"""
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import field_validator
+from pydantic import Field, field_validator
 from typing import List, Dict, Any, Optional
 from enum import Enum
 import os
@@ -97,7 +97,7 @@ class BaseConfig(BaseSettings):
     # =================================================================
     # 应用基础配置
     # =================================================================
-    debug: bool = True
+    debug: bool = Field(default=True, validation_alias="YIBAN_DEBUG")
     log_level: LogLevel = LogLevel.INFO
     timezone: str = "Asia/Shanghai"
     
@@ -320,6 +320,9 @@ class BaseConfig(BaseSettings):
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="allow",
+        # 只让 dotenv 匹配已定义字段，不把未匹配键（如旧 DEBUG）引入 extra，
+        # 避免其以小写键遮蔽同名 debug 字段的 model_dump 导出。
+        dotenv_filtering="only_existing",
     )
 
 
@@ -330,7 +333,7 @@ class DevelopmentConfig(BaseConfig):
     # 环境基础配置
     # =================================================================
     environment: Environment = Environment.DEVELOPMENT
-    debug: bool = True
+    debug: bool = Field(default=True, validation_alias="YIBAN_DEBUG")
     log_level: LogLevel = LogLevel.DEBUG
     
     # =================================================================
@@ -490,7 +493,7 @@ class TestingConfig(BaseConfig):
     # 环境基础配置
     # =================================================================
     environment: Environment = Environment.TESTING
-    debug: bool = True
+    debug: bool = Field(default=True, validation_alias="YIBAN_DEBUG")
     log_level: LogLevel = LogLevel.DEBUG
     
     # =================================================================
@@ -552,7 +555,7 @@ class StagingConfig(BaseConfig):
     # 环境基础配置
     # =================================================================
     environment: Environment = Environment.STAGING
-    debug: bool = False
+    debug: bool = Field(default=False, validation_alias="YIBAN_DEBUG")
     log_level: LogLevel = LogLevel.INFO
     
     # =================================================================
@@ -612,7 +615,7 @@ class ProductionConfig(BaseConfig):
     # 环境基础配置
     # =================================================================
     environment: Environment = Environment.PRODUCTION
-    debug: bool = False
+    debug: bool = Field(default=False, validation_alias="YIBAN_DEBUG")
     log_level: LogLevel = LogLevel.WARNING
     
     # =================================================================
