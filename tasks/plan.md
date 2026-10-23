@@ -32,7 +32,7 @@
 
 **推荐：开发、数据库集成测试、部署统一使用 MySQL 8.4 LTS；迁移工具 Alembic；纯逻辑测试不接数据库，SQLite 不作为 MySQL 迁移与约束的验收依据。**
 
-- **统一 MySQL 8.4 LTS**：依据 MySQL 官方发布模型（https://dev.mysql.com/doc/refman/8.4/en/mysql-releases.html），8.4 是首个 LTS（长期支持）版本（2024-04-30 GA），面向「稳定特性 + 较长支持周期」的场景，适合新项目基线；8.0 已进入仅修复阶段、剩余支持周期短于 8.4 LTS。NFR-06 最终云服务器部署，逻辑模型含多表外键与属主一致性；`aiomysql`/`pymysql` 已锁定，`core/database.py` 已支持。开发、数据库集成测试、部署三者用同一引擎与版本，迁移与约束（唯一索引、外键、事务）以 MySQL 8.4 实际行为为准。**仅调整规划，不安装、升级或操作本机已有数据库。**
+- **统一 MySQL 8.4 LTS**：依据 MySQL 官方发布模型（https://dev.mysql.com/doc/refman/8.4/en/mysql-releases.html），8.4 是首个 LTS（长期支持）版本（2024-04-30 GA），面向「稳定特性 + 较长支持周期」的场景，适合新项目基线；8.0 于 2026 年 4 月随 8.0.46 进入 EOL（官方 8.0 Release Notes：https://dev.mysql.com/doc/relnotes/mysql/8.0/en/，并建议升级到 8.4 LTS 或 Innovation）。NFR-06 最终云服务器部署，逻辑模型含多表外键与属主一致性；`aiomysql`/`pymysql` 已锁定，`core/database.py` 已支持。开发、数据库集成测试、部署三者用同一引擎与版本，迁移与约束（唯一索引、外键、事务）以 MySQL 8.4 实际行为为准。**仅调整规划，不安装、升级或操作本机已有数据库。**
 - **数据库启用方式**：未启用数据库时，应用保持 bootstrap「无外部数据库依赖」的现有运行边界；启用后必须使用**显式配置的译伴数据库**（`DATABASE_URL`），**配置缺失或连接失败应明确报错**，不得回退到教师示例库。
 - **迁移工具 Alembic（表结构唯一入口）**（新增依赖，待批准）：SQLAlchemy 官方迁移，`autogenerate` 生成版本、`upgrade/downgrade` 可回滚；**Alembic 是表结构版本与变更的唯一入口**。lifespan **只初始化、释放数据库连接资源，不执行 `create_all` 或自动升级迁移**。每个迁移版本只引用当时已定义的模型字段，**模型与其迁移在同一批次落地**，避免「迁移引用了后续批次才定义的字段」。
 - **测试分层**：① 无需数据库的基础测试（校验、哈希、会话撤销规则、路由语义）用 mock/内存替身，不接数据库；② 迁移/约束/事务测试使用**独立 MySQL 测试库**（如 `yiban_api_test`），与开发库（`yiban_api_dev`）隔离、`DATABASE_URL` 注入，**不连接其他项目数据库**；`upgrade`/`downgrade` 验证**限定在独立测试库**，不对已有开发数据执行回滚验收。
@@ -135,11 +135,11 @@
 见 `tasks/todo.md`，共 4 批（按可验收行为重排）：
 
 1. **MySQL 连接、User 模型及对应迁移基础**：MySQL 8.4 LTS 连接与独立测试库；`user` 模型 + 首个迁移；时间/email 规范化约定落地。
-2. **注册接口闭环**：注册校验（含密码长度/字节上限）、bcrypt 哈希、落库、重复邮箱 409、服务端固定普通角色；注册写接口 CSRF/Origin 校验。
-3. **用户登录/me/退出、会话与鉴权闭环**：`user_session` + 迁移、JWT 签发校验、真实密钥校验、退出撤销、`get_current_user` 真实实现、登录/退出 CSRF/Origin、Cookie/CORS 配置生效。
+2. **注册接口闭环**：注册校验（含密码长度/字节上限）、bcrypt 哈希、落库、重复邮箱 409、服务端固定普通角色；注册写接口 CSRF/Origin 校验，同批准备可信 Origin 配置、`X-Yiban-Request` 请求头与 CORS/OPTIONS 支持。
+3. **用户登录/me/退出、会话与鉴权闭环**：`user_session` + 迁移、JWT 签发校验、真实密钥校验、退出撤销、`get_current_user` 真实实现、登录/退出复用 CSRF/Origin、Cookie/CORS 配置生效。
 4. **管理员受控创建、独立登录、角色校验与双端会话隔离**：管理员受控创建、`/admin/auth/*`、`require_admin`、双端 `session_type`/`aud`/Cookie 隔离、管理端写接口 CSRF/Origin 复用。
 
-数据库连接生命周期（lifespan 仅初始化/释放连接资源）在批次 1 生效；注册写接口 CSRF 在批次 2、登录/退出 CSRF 与真实密钥校验在批次 3、管理端写接口 CSRF 在批次 4，不全部推迟到最后一批。
+数据库连接生命周期（lifespan 仅初始化/释放连接资源）在批次 1 生效；注册写接口 CSRF 及可信 Origin/CORS/OPTIONS 在批次 2 准备并生效，登录/退出复用 CSRF 与真实密钥校验在批次 3，管理端写接口 CSRF 在批次 4，不全部推迟到最后一批。
 
 ## 5. 基线测试待办（首批实施前处理，本轮仅记录）
 

@@ -9,7 +9,7 @@
 
 **Acceptance criteria:**
 - [ ] `user`（id/email UK/password_hash/display_name/role/created_at/updated_at）迁移可 `upgrade`/`downgrade`；email 唯一与规范化（strip+lower）约定落库；时间列 `DATETIME(6)` 存无时区 UTC，写入前转 UTC、读取后恢复 UTC 语义。
-- [ ] 时间往返测试通过（写 UTC → 读回 UTC 语义一致）；JWT `exp` 与 `session.expires_at` 换算到同一 UTC 时刻的过期比较正确。
+- [ ] 时间往返测试通过（写 UTC → 读回 UTC 语义一致）。
 - [ ] 开发库与集成测试库由 `DATABASE_URL` 隔离，纯逻辑测试不接数据库；`upgrade`/`downgrade` 验收限定独立测试库；基线测试 `tests/test_production_config.py` 子进程显式 `ALLOWED_HOSTS=localhost,127.0.0.1`，不依赖私有 `.env`。
 
 **Verification:**
@@ -26,7 +26,7 @@
 
 ## 任务 2：注册接口闭环
 
-**Description**：实现注册：邮箱/密码/昵称校验（含密码 ≥8 字符、UTF-8 ≤72 字节，超限拒绝不截断）、bcrypt 哈希（`run_in_executor` 不阻塞事件循环）、落库、重复邮箱 409、服务端固定普通角色 `'user'`（忽略请求体 role）；注册写接口 CSRF/Origin 校验（可信 Origin + `X-Yiban-Request: 1` 请求头）。
+**Description**：实现注册：邮箱/密码/昵称校验（含密码 ≥8 字符、UTF-8 ≤72 字节，超限拒绝不截断）、bcrypt 哈希（`run_in_executor` 不阻塞事件循环）、落库、重复邮箱 409、服务端固定普通角色 `'user'`（忽略请求体 role）；**同批启用注册写接口 CSRF/Origin 校验，并准备精确可信 Origin 配置、`X-Yiban-Request: 1` 自定义请求头及必要的 CORS/OPTIONS 预检支持**。
 
 **Acceptance criteria:**
 - [ ] 注册成功 201，返回 `{id, email, display_name, role='user'}`；请求体携带 `role` 被忽略或拒绝，绝不落库为 admin。
@@ -38,7 +38,7 @@
 
 **Dependencies:** 任务 1
 
-**Files likely touched:** `schemas/auth.py`、`repository/user_repository.py`、`service/auth_service.py`、`api/auth.py`、`app/`（注册路由装配 + CSRF/Origin 校验中间件/依赖）
+**Files likely touched:** `schemas/auth.py`、`repository/user_repository.py`、`service/auth_service.py`、`api/auth.py`、`app/`（注册路由装配 + CSRF/Origin 校验）、`config/config_unified.py`（可信 Origin/CORS）
 
 **Estimated scope:** M（3-5 文件）
 
@@ -46,10 +46,10 @@
 
 ## 任务 3：用户登录/me/退出、会话与鉴权闭环
 
-**Description**：实现 `user_session` 模型 + 迁移；登录签发 JWT（`sub`/`aud=user`/`role` 快照/`jti`/`exp`）并写 `user_session`；**真实签名密钥校验在任务 3 生效（任何真实 JWT 签发前）**；`get_current_user` 真实实现（每次鉴权同时验证 JWT 签名与 `exp`、`session.user_id == JWT.sub`、`session.jti == JWT.jti`、`user_session` 存在且未过期未撤销、`user` 存在，并校验 `aud`/`session_type`/端点绑定）；退出置 `revoked_at` 立即失效；登录/退出写接口 CSRF/Origin、httpOnly cookie、凭据型 CORS 显式 origin 配置在本批生效。
+**Description**：实现 `user_session` 模型 + 迁移；登录签发 JWT（`sub`/`aud=user`/`role` 快照/`jti`/`exp`）并写 `user_session`；**真实签名密钥校验在任务 3 生效（任何真实 JWT 签发前）**；`get_current_user` 真实实现（每次鉴权同时验证 JWT 签名与 `exp`、`session.user_id == JWT.sub`、`session.jti == JWT.jti`、`user_session` 存在且未过期未撤销、`user` 存在，并校验 `aud`/`session_type`/端点绑定）；退出置 `revoked_at` 立即失效；登录/退出写接口 CSRF/Origin（复用并扩展任务 2 的可信 Origin 校验与 `X-Yiban-Request` 请求头）、httpOnly cookie、凭据型 CORS 显式 origin 配置在本批生效。
 
 **Acceptance criteria:**
-- [ ] 登录签发 JWT + 写 `user_session(session_type='user')`；过期/伪造/已撤销 token 均 401；退出后原 token 立即 401。
+- [ ] 登录签发 JWT + 写 `user_session(session_type='user')`；JWT `exp` 与 `session.expires_at` 换算到同一 UTC 时刻、过期比较正确；过期/伪造/已撤销 token 均 401；退出后原 token 立即 401。
 - [ ] `me` 未认证/过期/退出后 401；每次鉴权满足 `session.user_id == JWT.sub`、`session.jti == JWT.jti` 且 `aud`/`session_type`/端点绑定；身份与角色由服务端查库得出（不信任 Token 内角色快照）。
 - [ ] 真实密钥校验生效（拒绝空值/教学默认值/`${PROD_SECRET_KEY}` 占位符）；登录/退出 CSRF/Origin（可信通过、恶意/缺失/null 拒绝、缺请求头拒绝、预检通过）；httpOnly + SameSite=Lax + Secure（开发 localhost 豁免）cookie；`cors_origins` 显式白名单并允许 `X-Yiban-Request`。
 
