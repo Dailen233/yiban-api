@@ -75,3 +75,17 @@ uv export --locked --no-dev --no-hashes --format requirements-txt --no-emit-proj
 - **原因**：这些教学容器与运维素材在当前初始化批次未启用，当前运行链不依赖它们；删除不改变运行时代码、依赖或启动行为，后续云服务器部署仍按 G1 和项目部署设计落实。
 - **实际验证**：`env -u DEBUG uv run --locked pytest -q`：6 passed，1 条上游弃用警告；`git diff --check` 无空白错误；健康检查、文档入口、OpenAPI、无外部基础设施启动、权限占位默认拒绝等既有行为保持不变。普通命令 `uv run --locked pytest -q` 曾受本机 `DEBUG=release` 环境变量影响而失败（`debug` 字段布尔解析冲突），该配置兼容问题留后续批次处理。
 - **快照边界**：本文件「来源」「初始化适配」「实际验证」各节，以及 `starter-manifest.json`、`starter-adjustments.patch` 描述的均为**首次提交时的快照**（65 个模板文件、逐文件散列与初始化差异），保持字节不变；本次裁剪不改变该快照追溯。原有初始化适配记录保持原貌。
+
+## DEBUG 环境变量冲突修复记录
+
+- **日期**：2026-10-23。
+- **根因**：
+  1. `debug: bool` 字段由 pydantic-settings 默认从同名环境变量 `DEBUG` 读取，进程存在非布尔 `DEBUG=release`（部署/构建环境常见）时布尔解析失败，导致配置导入失败。
+  2. 改用 `validation_alias="YIBAN_DEBUG"` 后读取问题解决，但 dotenv 中旧 `DEBUG` 键在 `case_sensitive=False` 下被小写为 `debug`，在 `extra="allow"` 下进入 `model_extra`，进而以小写 `debug` 键遮蔽 `model_dump()` 中同名字段的导出（属性为 bool、导出却为字符串）。
+- **修复**：
+  1. 对 `BaseConfig` 及各环境子类的 `debug` 字段加 `validation_alias="YIBAN_DEBUG"`，保留内部 `debug` 字段名、`settings.debug` 访问与 `model_dump()` 导出字段名。
+  2. `BaseConfig` 的 `model_config` 加 `dotenv_filtering="only_existing"`，让 dotenv 源只匹配已定义字段、不把未匹配键引入 extra，在加载边界消除旧 `DEBUG` 键对导出的遮蔽；子类经 model_config 继承合并自动生效（含 `DockerConfig`）。该规则会忽略 dotenv 中全部未声明字段、保留已声明字段及其别名的读取，后续新增配置需在配置类中声明字段，否则其 dotenv 值会被忽略。
+  3. 同步 `config/manage.py` 模板生成、`.env.example`、`.env.docker` 与 `README.md`。
+- **更正说明**：pydantic-settings 会忽略未匹配的**环境变量**，但 `extra="allow"` 下 dotenv 源会把未匹配的 **dotenv 键**作为 extra 引入；本批以 `dotenv_filtering="only_existing"` 消除该差异。
+- **验证**：`DEBUG=release uv run --locked pytest -q`：17 passed，1 条上游弃用警告。新增 `tests/test_debug_env_collision.py`（11 项）覆盖 DEBUG=release 导入、YIBAN_DEBUG true/false 与优先级、各环境默认值与取反、DockerConfig 继承、非法值拒绝、dotenv 污染与进程优先级、模板输出。
+- **已知遗留**：`ProductionConfig` 的 `docs_url: None` / `redoc_url: None` / `openapi_url: None` 为 pydantic v2 下「必填 NoneType」缺陷，导致 production 环境直接实例化报错；该问题预先存在、与本批修复无关，留后续配置批处理。

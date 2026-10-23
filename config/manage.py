@@ -117,8 +117,8 @@ def generate_env_template(environment: str) -> str:
             for key in keys:
                 if key in config_dict:
                     value = config_dict[key]
-                    # 转换为环境变量格式
-                    env_key = key.upper()
+                    # 转换为环境变量格式；debug 绑定专用环境变量 YIBAN_DEBUG
+                    env_key = "YIBAN_DEBUG" if key == "debug" else key.upper()
                     if isinstance(value, str):
                         template_lines.append(f"{env_key}={value}")
                     elif isinstance(value, (int, float, bool)):
