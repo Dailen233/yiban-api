@@ -12,6 +12,7 @@ import logging
 from typing import Any, AsyncGenerator, Dict, Optional
 
 from sqlalchemy import event, text
+from sqlalchemy.engine import make_url
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -53,11 +54,35 @@ def _to_async_url(database_url: str) -> str:
     return database_url
 
 
+def get_database_name(database_url: str) -> str:
+    """结构化解析数据库 URL 获取库名（不用整 URL 子串判断）。"""
+    return (make_url(database_url).database or "").strip()
+
+
+def is_teacher_sample_db(database_url: str) -> bool:
+    """教师示例库判断（按库名前缀 api_security_*，结构化而非子串）。"""
+    return get_database_name(database_url).startswith("api_security")
+
+
+def ensure_test_database(database_url: str, expected_db: str = "yiban_api_test") -> str:
+    """校验目标为译伴专用测试库，返回库名；非法或不匹配抛 ValueError。
+
+    供集成测试在执行迁移/删除/写入前保护目标库，采用结构化解析（非子串判断）。
+    """
+    try:
+        db_name = get_database_name(database_url)
+    except Exception as exc:
+        raise ValueError(f"无效的数据库 URL: {exc}") from exc
+    if db_name != expected_db:
+        raise ValueError(
+            f"目标库必须是译伴专用测试库 {expected_db}，实际为 {db_name}"
+        )
+    return db_name
+
+
 def _redact_url(database_url: str) -> str:
     """脱敏数据库 URL：仅保留 dialect + host + database，不泄露 user/password。"""
     try:
-        from sqlalchemy.engine import make_url
-
         parsed = make_url(database_url)
         return f"{parsed.drivername}://{parsed.host}/{parsed.database}"
     except Exception:
@@ -106,7 +131,7 @@ async def create_database_pool() -> None:
     database_url = getattr(settings, "database_url", None)
     if not database_url:
         raise ValueError("数据库已启用但未配置 DATABASE_URL")
-    if "api_security" in database_url:
+    if is_teacher_sample_db(database_url):
         raise ValueError("不能使用教师示例库，请显式配置译伴 DATABASE_URL")
 
     async_url = _to_async_url(database_url)

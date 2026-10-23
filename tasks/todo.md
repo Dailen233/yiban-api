@@ -8,13 +8,14 @@
 **Description**：接入 MySQL 8.4 LTS 连接与 Alembic（表结构唯一入口）；建立 `user` 表首个迁移（email UK、`DATETIME(6)` 无时区 UTC 约定）；lifespan **只初始化/释放连接资源，不 `create_all`、不自动迁移**；开发库与独立集成测试库隔离（`DATABASE_URL` 注入，不连接其他项目数据库，配置缺失/连接失败明确报错、不回退教师示例库）；处理基线测试的 `ALLOWED_HOSTS` 依赖（见下）。
 
 **Acceptance criteria:**
-- [x] `user` 模型与首个迁移脚本落地：`email` UNIQUE、`DATETIME(6)` 无时区 UTC、UUID 主键、`role` 默认 `'user'`；离线 SQL 验证通过（`alembic upgrade head --sql` 生成 `DEFAULT 'user'`、`UNIQUE(email)`、`DATETIME(6)`）。
-- [ ] 真实 MySQL 8.4 上的 `upgrade`→`downgrade`→`upgrade` 与持久化、规范化 email 唯一约束、事务回滚、UTC 时间往返（含非 UTC 偏移）验收 —— **阻塞：本机无 MySQL 8.4 实例（docker/containerd 均需 root 权限而当前用户无、sudo 需密码、无 mysql 二进制、端口 3306–3308 无监听）**；集成测试已编写并以 `skipif` 标记，未运行（跳过不视为通过）。
-- [x] 基线测试 `tests/test_production_config.py` 子进程显式 `ALLOWED_HOSTS`（JSON 数组）与 `DATABASE_ENABLED=false`，不依赖私有 `.env`；数据库默认关闭、启用时配置缺失或教师示例库明确报错；lifespan 仅初始化/释放连接资源，不 `create_all`、不自动迁移。
+- [x] `user` 模型与首个迁移脚本落地：`email` UNIQUE、`DATETIME(6)` 无时区 UTC、UUID 主键、`role` 默认 `'user'`；`UTCDateTime` 列类型绑定实现写入前转 UTC、读回恢复 UTC 语义（编译为 `DATETIME(6)`）；离线 SQL 验证通过（`DEFAULT 'user'`、`UNIQUE(email)`、`DATETIME(6)`）。
+- [x] 测试库保护：集成测试只读 `TEST_DATABASE_URL`（不回退 `DATABASE_URL`）、`ensure_test_database` 限定目标库名 `yiban_api_test`（结构化 `make_url` 解析，非子串判断），缺失跳过、非法报错；新增无需数据库的保护测试证明开发库/教师库/其他库/非法 URL 在迁移/写入前被拒绝；连接失败时引擎释放、全局状态不残留。
+- [ ] 真实 MySQL 8.4 上的 `upgrade`→`downgrade`→`upgrade` 与持久化、规范化 email 唯一约束、事务回滚、UTC 时间往返（含非 UTC 偏移）验收 —— **阻塞：本机无 MySQL 8.4 实例（docker/containerd 均需 root 权限而当前用户无、sudo 需密码、无 mysql 二进制）**；集成测试已编写（每项独立准备表结构）并以 `skipif` 标记，未运行（跳过不视为通过）。已准备 `docker-compose.mysql.yml` + `.env.test-db`，待你 sudo 启动实例后执行。
+- [x] 基线测试 `tests/test_production_config.py` 子进程显式 `ALLOWED_HOSTS`（JSON 数组）与 `DATABASE_ENABLED=false`，不依赖私有 `.env`；数据库默认关闭、启用时配置缺失或教师示例库按库名结构化拒绝；lifespan 仅初始化/释放连接资源，不 `create_all`、不自动迁移。
 
 **Verification:**
 - [x] `uv run alembic upgrade head --sql`（离线生成 SQL，验证迁移脚本）。
-- [x] `DEBUG=release uv run --locked pytest -q`：25 passed、4 skipped（集成测试因无 MySQL 跳过）。
+- [x] `DEBUG=release uv run --locked pytest -q`：36 passed、4 skipped（集成测试因无 MySQL 跳过）。
 - [ ] `uv run alembic upgrade head` + `downgrade -1`（仅独立测试库，阻塞）。
 
 **Dependencies:** None

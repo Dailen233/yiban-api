@@ -4,10 +4,10 @@ import uuid
 from datetime import datetime, timezone
 
 from sqlalchemy import String, text
-from sqlalchemy.dialects.mysql import DATETIME
 from sqlalchemy.orm import Mapped, mapped_column
 
 from core.database import Base
+from models.types import UTCDateTime
 
 
 def utcnow() -> datetime:
@@ -50,8 +50,8 @@ class User(Base):
         String(16), nullable=False, default="user", server_default=text("'user'")
     )
     created_at: Mapped[datetime] = mapped_column(
-        DATETIME(fsp=6), nullable=False, default=utcnow
+        UTCDateTime(), nullable=False, default=utcnow
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DATETIME(fsp=6), nullable=False, default=utcnow, onupdate=utcnow
+        UTCDateTime(), nullable=False, default=utcnow, onupdate=utcnow
     )

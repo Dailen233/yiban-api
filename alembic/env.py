@@ -14,7 +14,7 @@ from sqlalchemy import create_engine, pool
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from config import settings  # noqa: E402
-from core.database import Base  # noqa: E402
+from core.database import Base, is_teacher_sample_db  # noqa: E402
 import models.user  # noqa: F401,E402  # 注册 User 到 Base.metadata
 
 target_metadata = Base.metadata
@@ -24,7 +24,7 @@ def _database_url() -> str:
     url = settings.database_url
     if not url:
         raise RuntimeError("DATABASE_URL 未配置，无法执行迁移")
-    if "api_security" in url:
+    if is_teacher_sample_db(url):
         raise RuntimeError("不能使用教师示例库执行迁移，请显式配置译伴 DATABASE_URL")
     return url
 

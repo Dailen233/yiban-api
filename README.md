@@ -65,6 +65,26 @@ curl --noproxy '*' http://127.0.0.1:8001/health
 
 起步阶段附带的容器与运维素材（`docker/`、`deploy/`）已作为教学参考裁剪移除，不再随仓库保留；来源与删除记录见 [来源记录](docs/starter-source.md)。后续部署方案按项目设计阶段确定，云服务器部署目标（G1）保留不变；本批未启动任何容器或运维服务。
 
+### 本地 MySQL 8.4 测试实例（数据库集成验收用）
+
+数据库集成测试需要译伴专用 MySQL 8.4 实例（独立测试库 `yiban_api_test`，仅本机监听，开发/测试隔离）。本机 Docker 需 root 权限时，由你在终端输入 sudo 密码启动（命令与文档均不含密码）：
+
+1. 生成随机凭据到被 Git 忽略的 `.env.test-db`：
+   ```bash
+   python -c "import secrets; print('MYSQL_ROOT_PASSWORD='+secrets.token_urlsafe(24)); print('MYSQL_DATABASE=yiban_api_test'); print('MYSQL_USER=yiban'); print('MYSQL_PASSWORD='+secrets.token_urlsafe(24)); print('MYSQL_PORT=3308')" > .env.test-db
+   ```
+2. 启动容器（使用 `--env-file`，密码不写入命令）：
+   ```bash
+   sudo docker compose --env-file .env.test-db -f docker-compose.mysql.yml up -d
+   ```
+   容器名 `yiban-mysql-84-test`、卷 `yiban_mysql_test_data`、端口 `127.0.0.1:3308`。
+3. 连接验证（用 `.env.test-db` 中的 `yiban` 用户密码）：
+   ```bash
+   TEST_DATABASE_URL='mysql+pymysql://yiban:<password>@127.0.0.1:3308/yiban_api_test' \
+   uv run --locked pytest -q tests/test_account_db_integration.py
+   ```
+   集成测试只读 `TEST_DATABASE_URL` 并校验目标库名必须为 `yiban_api_test`，非译伴专用测试库会拒绝执行迁移/写入。
+
 ## Git 与后续范围
 
 仓库与前端同级放置，使用 `master` 稳定分支、`develop` 集成分支以及 `feature/*`、`fix/*`、`docs/*`。Gitee 为 `origin` 和 PR 合并入口，GitHub 为 `github` 镜像，同步相同提交；校内 GitLab 留到最终提交阶段。保留起步根提交，不在两平台各自合并同一变更。

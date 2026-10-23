@@ -112,4 +112,11 @@ uv export --locked --no-dev --no-hashes --format requirements-txt --no-emit-proj
   - 迁移离线 SQL：`uv run alembic upgrade head --sql` 生成 `DEFAULT 'user'`、`UNIQUE(email)`、`DATETIME(6)`。
   - **数据库集成验收阻塞**：本机无 MySQL 8.4 实例。已尝试并排除：docker daemon 运行但当前用户 `dailen` 不在 `docker` 组且 `/var/run/docker.sock` 为 `root:docker`（`docker ps` 报 permission denied）；`sudo -n` 需密码；`containerd`/`ctr` 可用但 `/run/containerd/containerd.sock` 为 `root:root`（`ctr` 同样 permission denied）；无 podman/rootless docker；无 mysql/mysqld 二进制；端口 3306–3308 无监听；本机 `.env` 指向教师示例库 `api_security_demo`（非译伴专用库）。`tests/test_account_db_integration.py`（4 项：upgrade/downgrade/upgrade、持久化+唯一约束+事务回滚、UTC 时间往返、应用启停）已编写并以 `skipif` 标记，未运行；**跳过不视为通过**，待具备译伴专用 MySQL 8.4 实例后执行。
 - **后续事项（本轮不实施）**：模板审查发现 `utils/audit.py` 模块级 `audit_logger = AuditLogger()` 在 `import app` 时即创建 `logs/audit/` 目录与两个 `RotatingFileHandler`（链：`app/middleware.py` → `middleware/__init__` → `audit_middleware` → `utils.audit`），即使审计中间件默认关闭；留待后续以惰性单例消除该导入副作用（副作用测试改用临时目录，不删除本机 logs/）。`passlib`/`aiosqlite` 依赖精简亦留后续，不混入本轮。
+- **测试库保护与 UTC 转换修正（同批追加）**：
+  1. 结构化 URL 校验：`core/database.py` 新增 `get_database_name`/`is_teacher_sample_db`/`ensure_test_database`（基于 `make_url` 解析库名，不再用整 URL 子串判断）；`create_database_pool` 与 `alembic/env.py` 均改用结构化判断教师示例库。
+  2. 测试库保护：集成测试只读 `TEST_DATABASE_URL`（移除 `DATABASE_URL` 回退），`ensure_test_database` 限定目标库名 `yiban_api_test`；缺失跳过、非法报错。新增无需数据库的保护测试证明开发库/教师库/其他库/非法 URL 在迁移/删除/写入前被拒绝。
+  3. 真实 UTC 转换：新增 `models/types.py::UTCDateTime`（`DATETIME(6)` 列类型绑定，`cache_ok=True`），写入前 aware→UTC naive、读回后恢复 aware UTC；`models/user.py` 的 created_at/updated_at 改用 `UTCDateTime`（编译仍为 `DATETIME(6)`）。UTC 测试直接传带 +08:00 偏移与微秒的原始 aware 时间，不替应用预先转换。
+  4. 测试前置：每个集成测试独立准备/清理表结构（`prepared_schema` fixture upgrade→downgrade，不依赖 upgrade 测试先执行）；新增连接失败时引擎释放、全局状态不残留的行为测试；应用启停测试显式 `base_url='http://localhost'` 与数据库配置。
+  5. 新增依赖 `cryptography>=42.0.0`（解析到 50.0.2，含 cffi/pycparser）：MySQL 8.0+/8.4 默认 caching_sha2_password 认证，PyMySQL/aiomysql 需 cryptography（官方：pymysql.readthedocs.io 建议 `PyMySQL[rsa]`）。
+  6. 手动启动数据库：`docker-compose.mysql.yml`（容器 `yiban-mysql-84-test`、卷 `yiban_mysql_test_data`、端口 `127.0.0.1:3308`、`--default-time-zone=+00:00`）配合被 Git 忽略的 `.env.test-db`（随机凭据）；启动命令见 README。基础测试现为 **36 passed、4 skipped**。
 - **边界**：本文件「来源」「初始化适配」各节及 `starter-manifest.json`、`starter-adjustments.patch` 保持字节不变，仅追加本记录。

@@ -16,7 +16,7 @@
 
 Python 3.12、uv、FastAPI、Pydantic 2 与 SQLAlchemy 的框架基础沿用起步项目。先按 uv.lock 安装，不因教师队列等模板素材存在而预先定案数据库、异步机制或生产架构。业务按用户明确批次推进，不将本次初始化边界当成永久禁令。
 
-默认生命周期不连接数据库（`DATABASE_ENABLED=false`）、Redis或启动内存队列；启用数据库须显式配置译伴 `DATABASE_URL`，表结构由 Alembic 唯一管理、lifespan 不执行 create_all 或自动迁移。健康为 bootstrap 不代表业务或数据就绪。权限占位依赖默认拒绝；不得将其改为无条件通过、接受固定测试 Token 或使用 localStorage 标记充当真实权限。
+默认生命周期不连接数据库（`DATABASE_ENABLED=false`）、Redis或启动内存队列；启用数据库须显式配置译伴 `DATABASE_URL`，教师示例库（`api_security_*` 前缀）按库名结构化拒绝（`make_url` 解析，非整 URL 子串判断）；表结构由 Alembic 唯一管理、lifespan 不执行 create_all 或自动迁移；MySQL 8.4 默认 caching_sha2_password 认证，依赖含 `cryptography`。数据库集成测试只读 `TEST_DATABASE_URL` 并校验目标库名必须为 `yiban_api_test`，非译伴专用测试库拒绝执行迁移/写入。健康为 bootstrap 不代表业务或数据就绪。权限占位依赖默认拒绝；不得将其改为无条件通过、接受固定测试 Token 或使用 localStorage 标记充当真实权限。
 
 ## 分层与数据规则
 
