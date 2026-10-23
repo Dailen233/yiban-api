@@ -78,10 +78,10 @@ def _read_debug(env: dict) -> str:
 
 
 def test_generic_debug_release_does_not_break_import():
-    """通用 DEBUG=release 不应导致配置导入失败；development 默认 debug=True 且为 bool。"""
+    """通用 DEBUG=release 不应导致配置导入失败；显式 YIBAN_DEBUG=true 读取为 True bool。"""
     result = _run_py(
         "from config import settings; print(settings.debug, type(settings.debug).__name__)",
-        {"FASTAPI_ENV": "development", "DEBUG": "release"},
+        {"FASTAPI_ENV": "development", "DEBUG": "release", "YIBAN_DEBUG": "true"},
     )
     assert result.returncode == 0, result.stderr
     assert result.stdout.strip() == "True bool"
@@ -192,7 +192,7 @@ def test_dotenv_yiban_debug_process_priority():
 
 
 def test_template_generates_yiban_debug():
-    """配置模板生成器应输出 YIBAN_DEBUG 及正确生成值，而非旧 DEBUG。"""
+    """配置模板生成器应输出 YIBAN_DEBUG 及正确生成值，而非旧 DEBUG（显式配置值）。"""
     script = (
         "from config.manage import generate_env_template\n"
         "t = generate_env_template('development')\n"
@@ -201,8 +201,8 @@ def test_template_generates_yiban_debug():
         "any(l.startswith('DEBUG=') for l in lines))\n"
         "print([l for l in lines if l.startswith('YIBAN_DEBUG=')])\n"
     )
-    result = _run_py(script, {})
+    result = _run_py(script, {"FASTAPI_ENV": "development", "YIBAN_DEBUG": "true"})
     assert result.returncode == 0, result.stderr
     lines = result.stdout.strip().splitlines()
     assert lines[0] == "True False"  # 有 YIBAN_DEBUG、无独立 DEBUG 行
-    assert lines[1] == "['YIBAN_DEBUG=true']"  # development 默认值为 true
+    assert lines[1] == "['YIBAN_DEBUG=true']"  # 显式 YIBAN_DEBUG=true 的生成值
