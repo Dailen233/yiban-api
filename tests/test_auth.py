@@ -113,6 +113,7 @@ def test_session_token_requires_claims():
 def _auth_client(monkeypatch, service, current_user=None):
     from service.dependencies import get_auth_service
 
+    monkeypatch.setattr(settings, "auth_enabled", True)
     app = create_app()
 
     async def svc_override():
@@ -220,3 +221,81 @@ def test_logout_returns_204_and_clears_cookie(monkeypatch):
     )
     assert r.status_code == 204
     assert "yiban_user_session" in r.headers.get("set-cookie", "")
+
+
+# ---- 固定算法 HS256（不接受 settings.algorithm 或其他算法）----
+
+def test_session_token_ignores_configured_algorithm(monkeypatch):
+    """即使配置改为 HS384，会话 Token 仍固定 HS256。"""
+    monkeypatch.setattr(settings, "algorithm", "HS384")
+    token = create_session_token(sub="u1", jti="j1", aud="user", expires_at=_expires())
+    assert jwt.get_unverified_header(token)["alg"] == "HS256"
+    payload = decode_session_token(token, aud="user")
+    assert payload["sub"] == "u1"
+
+
+def test_session_token_rejects_hs384_token():
+    """HS384 签发的 Token 被拒（会话仅接受 HS256）。"""
+    hs384_token = jwt.encode(
+        {"sub": "u1", "jti": "j1", "aud": "user", "exp": _expires()},
+        "wrong-secret-key-for-hs384-testing-0123456789-abcdef",
+        algorithm="HS384",
+    )
+    with pytest.raises(AuthenticationException):
+        decode_session_token(hs384_token, aud="user")
+
+
+# ---- 密钥长度按 UTF-8 字节数 ----
+
+def test_validate_secret_uses_utf8_byte_length():
+    # 11 个中文字符：字符数 11（<32）但 UTF-8 字节数 33（≥32）→ 通过（证明按字节）
+    validate_jwt_secret_key("密" * 11)
+    # 10 个中文字符：UTF-8 字节数 30（<32）→ 拒绝
+    with pytest.raises(ValueError):
+        validate_jwt_secret_key("密" * 10)
+
+
+# ---- AUTH_ENABLED 关闭时鉴权接口拒绝（先于数据库访问）----
+
+def test_login_disabled_returns_503(monkeypatch):
+    monkeypatch.setattr(settings, "auth_enabled", False)
+    client = TestClient(create_app(), base_url="http://localhost")
+    r = client.post(
+        "/api/v1/auth/login",
+        json={"email": "a@b.com", "password": "password123"},
+        headers={"Origin": VALID_ORIGIN, "X-Yiban-Request": "1"},
+    )
+    assert r.status_code == 503
+
+
+def test_me_disabled_returns_503(monkeypatch):
+    monkeypatch.setattr(settings, "auth_enabled", False)
+    client = TestClient(create_app(), base_url="http://localhost")
+    assert client.get("/api/v1/auth/me").status_code == 503
+
+
+def test_logout_disabled_returns_503(monkeypatch):
+    monkeypatch.setattr(settings, "auth_enabled", False)
+    client = TestClient(create_app(), base_url="http://localhost")
+    r = client.post(
+        "/api/v1/auth/logout",
+        headers={"Origin": VALID_ORIGIN, "X-Yiban-Request": "1"},
+    )
+    assert r.status_code == 503
+
+
+# ---- 弱密钥阻止启动且不创建连接池 ----
+
+def test_weak_secret_prevents_startup_no_pool(monkeypatch):
+    from core import database as db_module
+
+    monkeypatch.setattr(settings, "auth_enabled", True)
+    monkeypatch.setattr(settings, "database_enabled", True)
+    monkeypatch.setattr(settings, "effective_jwt_secret_key", "weak-secret")
+    monkeypatch.setattr(db_module, "async_engine", None)
+
+    with pytest.raises(ValueError):
+        with TestClient(create_app(), base_url="http://localhost"):
+            pass
+
+    assert db_module.async_engine is None

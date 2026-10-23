@@ -266,3 +266,32 @@ def test_login_cookie_attributes(client):
     assert "httponly" in set_cookie.lower()
     assert "samesite=lax" in set_cookie.lower()
     assert "path=/" in set_cookie.lower()
+
+
+def test_auth_disabled_with_db_503_and_no_session(prepared_schema, monkeypatch):
+    """鉴权关闭、数据库开启：login/me/logout 均 503，登录不新增会话。"""
+    from config import settings
+    from app import create_app
+
+    monkeypatch.setattr(settings, "database_enabled", True)
+    monkeypatch.setattr(settings, "database_url", TEST_DATABASE_URL)
+    monkeypatch.setattr(settings, "auth_enabled", False)
+    monkeypatch.setattr(settings, "effective_jwt_secret_key", SECRET)
+
+    with TestClient(create_app(), base_url="http://localhost") as c:
+        # 注册不受 auth_enabled 影响（保持已验收注册行为）
+        assert _register(c, "off@test.com").status_code == 201
+
+        r = _login(c, "off@test.com")
+        assert r.status_code == 503
+        assert c.get("/api/v1/auth/me").status_code == 503
+        assert (
+            c.post(
+                "/api/v1/auth/logout",
+                headers={"Origin": VALID_ORIGIN, "X-Yiban-Request": "1"},
+            ).status_code
+            == 503
+        )
+
+    # 登录未新增会话
+    assert len(_fetch_sessions("off@test.com")) == 0

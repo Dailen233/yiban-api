@@ -30,15 +30,16 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     setup_logging(level=settings.log_level)
     if settings.auth_enabled and not settings.database_enabled:
         raise ValueError("启用真实鉴权必须同时启用数据库")
-    if settings.database_enabled:
-        await create_database_pool()
-        logger.info("译伴基础工程启动；数据库连接池已初始化")
-    else:
-        logger.info("译伴基础工程启动；业务基础设施尚未接入")
     if settings.auth_enabled:
+        # 密钥校验先于连接池创建：弱密钥直接失败，不残留连接池
         validate_jwt_secret_key(settings.effective_jwt_secret_key)
         logger.info("真实鉴权已启用")
     try:
+        if settings.database_enabled:
+            await create_database_pool()
+            logger.info("译伴基础工程启动；数据库连接池已初始化")
+        else:
+            logger.info("译伴基础工程启动；业务基础设施尚未接入")
         yield
     finally:
         if settings.database_enabled:

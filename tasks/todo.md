@@ -55,11 +55,12 @@
 **Acceptance criteria:**
 - [x] 登录签发 JWT（`sub`/`jti`/`aud=user`/`exp`，无角色快照）+ 写 `user_session(session_type='user')`；JWT `exp` 与 `session.expires_at` 由同一 UTC 到期时刻产生（`expires_at` 存 DATETIME(6) 微秒、`exp` 由 PyJWT 编码时秒级截断）；过期/伪造/已撤销 token 均 401；退出后原 token 立即 401。
 - [x] `me` 未认证/过期/退出后 401；每次鉴权满足 `session.user_id == JWT.sub`、`session.jti == JWT.jti` 且 `aud=user`/`session_type=user`/端点绑定；身份与角色由服务端查库得出（JWT 不含角色快照，不信任 Token 内角色）。
-- [x] 真实密钥校验生效（拒绝空值/短密钥<32字节/教学默认值/`${PROD_SECRET_KEY}` 占位符）；登录/退出 CSRF/Origin 复用注册的可信 Origin + `X-Yiban-Request: 1` 校验；httpOnly + SameSite=Lax + Secure（生产，开发 localhost 豁免）cookie；`cors_origins` 显式白名单。
+- [x] 真实密钥校验生效（拒绝空值/短密钥 <32 字节（UTF-8 编码字节数，非字符数）/教学默认值/`${PROD_SECRET_KEY}` 占位符）；会话 Token 固定 HS256（不接受 `settings.algorithm` 或其他算法）；登录/退出 CSRF/Origin 复用注册的可信 Origin + `X-Yiban-Request: 1` 校验；httpOnly + SameSite=Lax + Secure（生产，开发 localhost 豁免）cookie；`cors_origins` 显式白名单。
+- [x] `AUTH_ENABLED` 真正控制鉴权：关闭时 login/me/logout 均返回 503（检查先于数据库访问，数据库也关闭时不 500、登录不新增会话、不误关注册）；弱密钥启动失败且不创建连接池；启用时正常登录/me/退出闭环。
 
 **Verification:**
-- [x] `tests/test_auth.py`（基础 18：密钥校验/JWT 往返/aud 绑定/过期/伪造/声明/HTTP 层/Cookie）+ `tests/test_auth_integration.py`（集成 10，真实 MySQL 8.4.13：完整闭环/错误凭据/会话持久化/撤销/伪造/过期会话/Cookie 属性）。
-- [x] 带 `TEST_DATABASE_URL` 完整回归 `DEBUG=release uv run --locked pytest -q`：100 passed、0 skipped。
+- [x] `tests/test_auth.py`（基础 25：密钥校验/字节长度/JWT 往返/固定 HS256/aud 绑定/过期/伪造/声明/HTTP 层/Cookie/AUTH_ENABLED 关闭 503/弱密钥启动）+ `tests/test_auth_integration.py`（集成 11，真实 MySQL 8.4.13：完整闭环/错误凭据/会话持久化/撤销/伪造/过期会话/Cookie 属性/鉴权关闭不新增会话）。
+- [x] 带 `TEST_DATABASE_URL` 完整回归 `DEBUG=release uv run --locked pytest -q`：108 passed、0 skipped。
 
 **Dependencies:** 任务 2
 

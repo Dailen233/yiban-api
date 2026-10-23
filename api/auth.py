@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, Request, Response, status
 
 from config import settings
 from core.csrf import require_trusted_origin
-from core.permissions import USER_SESSION_COOKIE, get_current_user
+from core.permissions import USER_SESSION_COOKIE, get_current_user, require_auth_enabled
 from models.user import User
 from schemas.auth import LoginRequest, RegisterRequest, RegisterResponse, UserResponse
 from service.auth_service import AuthService
@@ -52,7 +52,7 @@ async def register(
 @router.post(
     "/login",
     response_model=UserResponse,
-    dependencies=[Depends(require_trusted_origin)],
+    dependencies=[Depends(require_auth_enabled), Depends(require_trusted_origin)],
 )
 async def login(
     payload: LoginRequest,
@@ -65,7 +65,7 @@ async def login(
     return user
 
 
-@router.get("/me", response_model=UserResponse)
+@router.get("/me", response_model=UserResponse, dependencies=[Depends(require_auth_enabled)])
 async def me(
     current_user: Annotated[User, Depends(get_current_user)],
 ) -> UserResponse:
@@ -81,7 +81,7 @@ async def me(
 @router.post(
     "/logout",
     status_code=status.HTTP_204_NO_CONTENT,
-    dependencies=[Depends(require_trusted_origin)],
+    dependencies=[Depends(require_auth_enabled), Depends(require_trusted_origin)],
 )
 async def logout(
     request: Request,

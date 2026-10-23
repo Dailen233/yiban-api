@@ -12,6 +12,7 @@ from fastapi import Depends, HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from config import settings
 from core.database import get_async_session
 from core.token import decode_session_token
 from models.user import User
@@ -19,6 +20,16 @@ from models.user_session import UserSession
 from utils.custom_exceptions import AuthenticationException
 
 USER_SESSION_COOKIE = "yiban_user_session"
+
+
+async def require_auth_enabled() -> None:
+    """鉴权开关未启用时拒绝（503），先于任何数据库访问。
+
+    关闭鉴权时 login/me/logout 均返回 503；即使数据库也关闭，也不会因解析
+    数据库依赖而返回 500。
+    """
+    if not settings.auth_enabled:
+        raise HTTPException(status_code=503, detail="鉴权服务未启用")
 
 
 async def _get_session_by_jti(db: AsyncSession, jti: str) -> UserSession | None:

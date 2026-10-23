@@ -4,6 +4,7 @@ import asyncio
 import uuid
 from datetime import datetime, timedelta, timezone
 
+from fastapi import HTTPException, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -81,6 +82,9 @@ class AuthService:
 
     async def login(self, payload: LoginRequest) -> tuple[UserResponse, str]:
         """登录：查库验密码（不泄露账号存在性），签发 JWT + 持久化会话。"""
+        if not settings.auth_enabled:
+            # 服务层防御：开关关闭不得绕过路由签发真实会话
+            raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="鉴权服务未启用")
         email = normalize_email(payload.email)
         user = await self.user_repo.get_by_email(email)
         if user is None:
