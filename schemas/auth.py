@@ -50,3 +50,24 @@ class RegisterResponse(BaseModel):
     email: str
     display_name: str
     role: str
+
+
+class LoginRequest(BaseModel):
+    """登录请求。密码原样验证，不做 strip/lower。"""
+
+    email: str = Field(..., description="邮箱")
+    password: str = Field(..., description="密码")
+
+    @field_validator("email")
+    @classmethod
+    def _normalize_email(cls, v: str) -> str:
+        return v.strip().lower()
+
+
+class UserResponse(BaseModel):
+    """用户身份响应（登录/me，绝不返回 JWT/密码/哈希）。"""
+
+    id: str
+    email: str
+    display_name: str
+    role: str
