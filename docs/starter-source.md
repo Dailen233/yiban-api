@@ -88,4 +88,11 @@ uv export --locked --no-dev --no-hashes --format requirements-txt --no-emit-proj
   3. 同步 `config/manage.py` 模板生成、`.env.example`、`.env.docker` 与 `README.md`。
 - **更正说明**：pydantic-settings 会忽略未匹配的**环境变量**，但 `extra="allow"` 下 dotenv 源会把未匹配的 **dotenv 键**作为 extra 引入；本批以 `dotenv_filtering="only_existing"` 消除该差异。
 - **验证**：`DEBUG=release uv run --locked pytest -q`：17 passed，1 条上游弃用警告。新增 `tests/test_debug_env_collision.py`（11 项）覆盖 DEBUG=release 导入、YIBAN_DEBUG true/false 与优先级、各环境默认值与取反、DockerConfig 继承、非法值拒绝、dotenv 污染与进程优先级、模板输出。
-- **已知遗留**：`ProductionConfig` 的 `docs_url: None` / `redoc_url: None` / `openapi_url: None` 为 pydantic v2 下「必填 NoneType」缺陷，导致 production 环境直接实例化报错；该问题预先存在、与本批修复无关，留后续配置批处理。
+- **已知遗留**：`ProductionConfig` 的 `docs_url: None` / `redoc_url: None` / `openapi_url: None` 为 pydantic v2 下「必填 NoneType」缺陷，导致 production 环境直接实例化报错；该问题预先存在、与本批修复无关，留后续配置批处理。（已在下一批「生产配置文档字段缺省值修复记录」解决。）
+
+## 生产配置文档字段缺省值修复记录
+
+- **日期**：2026-10-23。
+- **根因**：`ProductionConfig` 的 `docs_url: None` / `redoc_url: None` / `openapi_url: None` 三个字段把 `None` 当作类型注解（NoneType）而非默认值，pydantic v2 下视为「必填字段」，直接实例化报三个 missing 错误。
+- **修复**：为三个字段补显式默认值 `None`（`docs_url: None = None` 等），保持原有 NoneType 约束及生产环境默认禁用文档的意图；`AppConfig.get_app_config()` 仍以 `getattr(settings, "docs_url", "/docs")` 读取，None 时 FastAPI 不挂载文档路由。
+- **验证**：`DEBUG=release uv run --locked pytest -q`：19 passed，1 条上游弃用警告。新增 `tests/test_production_config.py`（2 项）覆盖：production 无需显式传入文档字段即可实例化（三者均为 None、debug 默认 False），以及隔离子进程下真实应用入口可创建、`/health` 返回 bootstrap、`/docs` `/redoc` `/openapi.json` 返回 404（production 的 TrustedHostMiddleware 仅允许 localhost/127.0.0.1）。移除 `tests/test_debug_env_collision.py` 中为绕过此缺陷而显式传入三个 None 的辅助参数。

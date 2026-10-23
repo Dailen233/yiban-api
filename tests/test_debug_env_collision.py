@@ -31,7 +31,6 @@ def _check_config(
     cls: str,
     process_env: dict,
     dotenv_content: str | None = None,
-    extra_kwargs: str = "",
 ) -> dict:
     """在子进程中实例化配置类，返回属性/导出/extra 的核对结果。
 
@@ -39,11 +38,11 @@ def _check_config(
     - 否则写入临时 dotenv 文件并显式以 _env_file 传入，避免依赖本机 .env。
     """
     if dotenv_content is None:
-        ctor = f"{cls}(_env_file=None{', ' + extra_kwargs if extra_kwargs else ''})"
+        ctor = f"{cls}(_env_file=None)"
         header = ""
         footer = ""
     else:
-        ctor = f"{cls}(_env_file=f.name{', ' + extra_kwargs if extra_kwargs else ''})"
+        ctor = f"{cls}(_env_file=f.name)"
         header = (
             "import tempfile, os\n"
             "f = tempfile.NamedTemporaryFile('w', suffix='.env', delete=False)\n"
@@ -110,13 +109,7 @@ def test_environment_defaults_without_yiban_debug():
         info = _check_config(env_cls, {})
         assert info["attr"] is expected and info["attr_type"] == "bool", env_cls
         assert info["dump"] is expected and info["dump_type"] == "bool", env_cls
-    # production 存在独立的 docs_url/redoc_url/openapi_url=None 必填缺陷
-    # （预先存在、非本轮引入），显式补齐三个 None 单独验证 debug 默认值。
-    info = _check_config(
-        "ProductionConfig",
-        {},
-        extra_kwargs="docs_url=None, redoc_url=None, openapi_url=None",
-    )
+    info = _check_config("ProductionConfig", {})
     assert info["attr"] is False and info["attr_type"] == "bool"
 
 
