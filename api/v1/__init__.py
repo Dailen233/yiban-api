@@ -7,10 +7,9 @@
 
 from fastapi import APIRouter
 
-v1_router = APIRouter()
+from api.auth import router as auth_router
 
-# ---- 脚手架追加区 ----
-# from api.v1.{{first_resource}} import router as {{class_name}}Router
-# v1_router.include_router({{class_name}}Router)
+v1_router = APIRouter()
+v1_router.include_router(auth_router)
 
 __all__ = ["v1_router"]
