@@ -16,6 +16,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from config import settings  # noqa: E402
 from core.database import Base, is_teacher_sample_db  # noqa: E402
 import models.user  # noqa: F401,E402  # 注册 User 到 Base.metadata
+import models.user_session  # noqa: F401,E402  # 注册 UserSession 到 Base.metadata
 
 target_metadata = Base.metadata
 

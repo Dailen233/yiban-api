@@ -1,15 +1,38 @@
-"""认证接口（任务 2：注册）。登录/me/退出留任务 3。"""
+"""认证接口（注册/登录/me/退出）。"""
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Request, Response, status
 
+from config import settings
 from core.csrf import require_trusted_origin
-from schemas.auth import RegisterRequest, RegisterResponse
+from core.permissions import USER_SESSION_COOKIE, get_current_user
+from models.user import User
+from schemas.auth import LoginRequest, RegisterRequest, RegisterResponse, UserResponse
 from service.auth_service import AuthService
 from service.dependencies import get_auth_service
 
 router = APIRouter(prefix="/auth", tags=["认证"])
+
+
+def _cookie_secure() -> bool:
+    """生产环境 Cookie 必须 Secure；本地 HTTP 开发豁免。"""
+    return settings.environment == "production"
+
+
+def _set_session_cookie(response: Response, token: str) -> None:
+    response.set_cookie(
+        key=USER_SESSION_COOKIE,
+        value=token,
+        httponly=True,
+        samesite="lax",
+        secure=_cookie_secure(),
+        path="/",
+    )
+
+
+def _delete_session_cookie(response: Response) -> None:
+    response.delete_cookie(key=USER_SESSION_COOKIE, path="/")
 
 
 @router.post(
@@ -24,3 +47,49 @@ async def register(
 ) -> RegisterResponse:
     """注册普通用户，服务端固定 role='user'。"""
     return await auth_service.register(payload)
+
+
+@router.post(
+    "/login",
+    response_model=UserResponse,
+    dependencies=[Depends(require_trusted_origin)],
+)
+async def login(
+    payload: LoginRequest,
+    response: Response,
+    auth_service: Annotated[AuthService, Depends(get_auth_service)],
+) -> UserResponse:
+    """登录：签发 JWT + 持久化会话，设置用户 Cookie；响应不回传 JWT。"""
+    user, token = await auth_service.login(payload)
+    _set_session_cookie(response, token)
+    return user
+
+
+@router.get("/me", response_model=UserResponse)
+async def me(
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> UserResponse:
+    """返回当前用户身份（以数据库记录为准，不信任 Token 角色快照）。"""
+    return UserResponse(
+        id=current_user.id,
+        email=current_user.email,
+        display_name=current_user.display_name,
+        role=current_user.role,
+    )
+
+
+@router.post(
+    "/logout",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_trusted_origin)],
+)
+async def logout(
+    request: Request,
+    response: Response,
+    auth_service: Annotated[AuthService, Depends(get_auth_service)],
+    _current_user: Annotated[User, Depends(get_current_user)],
+) -> None:
+    """退出：撤销会话 jti + 清除 Cookie，返回 204。"""
+    token = request.cookies.get(USER_SESSION_COOKIE, "")
+    await auth_service.logout(token)
+    _delete_session_cookie(response)

@@ -53,12 +53,13 @@
 **Description**：实现 `user_session` 模型 + 迁移；登录签发 JWT（`sub`/`aud=user`/`role` 快照/`jti`/`exp`）并写 `user_session`；**真实签名密钥校验在任务 3 生效（任何真实 JWT 签发前）**；`get_current_user` 真实实现（每次鉴权同时验证 JWT 签名与 `exp`、`session.user_id == JWT.sub`、`session.jti == JWT.jti`、`user_session` 存在且未过期未撤销、`user` 存在，并校验 `aud`/`session_type`/端点绑定）；退出置 `revoked_at` 立即失效；登录/退出写接口 CSRF/Origin（复用并扩展任务 2 的可信 Origin 校验与 `X-Yiban-Request` 请求头）、httpOnly cookie、凭据型 CORS 显式 origin 配置在本批生效。
 
 **Acceptance criteria:**
-- [ ] 登录签发 JWT + 写 `user_session(session_type='user')`；JWT `exp` 与 `session.expires_at` 换算到同一 UTC 时刻、过期比较正确；过期/伪造/已撤销 token 均 401；退出后原 token 立即 401。
-- [ ] `me` 未认证/过期/退出后 401；每次鉴权满足 `session.user_id == JWT.sub`、`session.jti == JWT.jti` 且 `aud`/`session_type`/端点绑定；身份与角色由服务端查库得出（不信任 Token 内角色快照）。
-- [ ] 真实密钥校验生效（拒绝空值/教学默认值/`${PROD_SECRET_KEY}` 占位符）；登录/退出 CSRF/Origin（可信通过、恶意/缺失/null 拒绝、缺请求头拒绝、预检通过）；httpOnly + SameSite=Lax + Secure（开发 localhost 豁免）cookie；`cors_origins` 显式白名单并允许 `X-Yiban-Request`。
+- [x] 登录签发 JWT（`sub`/`jti`/`aud=user`/`exp`，无角色快照）+ 写 `user_session(session_type='user')`；JWT `exp` 与 `session.expires_at` 由同一 UTC 到期时刻产生（`expires_at` 存 DATETIME(6) 微秒、`exp` 由 PyJWT 编码时秒级截断）；过期/伪造/已撤销 token 均 401；退出后原 token 立即 401。
+- [x] `me` 未认证/过期/退出后 401；每次鉴权满足 `session.user_id == JWT.sub`、`session.jti == JWT.jti` 且 `aud=user`/`session_type=user`/端点绑定；身份与角色由服务端查库得出（JWT 不含角色快照，不信任 Token 内角色）。
+- [x] 真实密钥校验生效（拒绝空值/短密钥<32字节/教学默认值/`${PROD_SECRET_KEY}` 占位符）；登录/退出 CSRF/Origin 复用注册的可信 Origin + `X-Yiban-Request: 1` 校验；httpOnly + SameSite=Lax + Secure（生产，开发 localhost 豁免）cookie；`cors_origins` 显式白名单。
 
 **Verification:**
-- `uv run --locked pytest -q tests/ -k auth`（会话/鉴权聚焦测试，覆盖过期、退出、越权、密钥校验、Cookie/CORS、CSRF）。
+- [x] `tests/test_auth.py`（基础 18：密钥校验/JWT 往返/aud 绑定/过期/伪造/声明/HTTP 层/Cookie）+ `tests/test_auth_integration.py`（集成 10，真实 MySQL 8.4.13：完整闭环/错误凭据/会话持久化/撤销/伪造/过期会话/Cookie 属性）。
+- [x] 带 `TEST_DATABASE_URL` 完整回归 `DEBUG=release uv run --locked pytest -q`：100 passed、0 skipped。
 
 **Dependencies:** 任务 2
 

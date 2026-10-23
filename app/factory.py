@@ -9,6 +9,7 @@ from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from api import register_routers
 from config import settings
 from core.database import close_database_pool, create_database_pool
+from core.token import validate_jwt_secret_key
 from utils.logger import get_logger, setup_logging
 
 from .config import AppConfig
@@ -27,11 +28,16 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     （表结构由 Alembic 唯一管理）。
     """
     setup_logging(level=settings.log_level)
+    if settings.auth_enabled and not settings.database_enabled:
+        raise ValueError("启用真实鉴权必须同时启用数据库")
     if settings.database_enabled:
         await create_database_pool()
         logger.info("译伴基础工程启动；数据库连接池已初始化")
     else:
         logger.info("译伴基础工程启动；业务基础设施尚未接入")
+    if settings.auth_enabled:
+        validate_jwt_secret_key(settings.effective_jwt_secret_key)
+        logger.info("真实鉴权已启用")
     try:
         yield
     finally:

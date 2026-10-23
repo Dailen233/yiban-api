@@ -52,6 +52,8 @@ class BaseConfig(BaseSettings):
     # 默认关闭：bootstrap 不连接外部数据库；启用后必须显式配置译伴 DATABASE_URL（不得回退教师示例库）
     database_enabled: bool = False
     database_url: str = "mysql+pymysql://dev_user:123456@localhost:3306/api_security_demo"
+    # 真实鉴权默认关闭：启用要求数据库已启用且 effective_jwt_secret_key 通过校验
+    auth_enabled: bool = False
     
     # 数据库连接池基础配置
     db_pool_size: int = 10
