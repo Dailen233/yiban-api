@@ -47,30 +47,22 @@ curl --noproxy '*' http://127.0.0.1:8001/health
 | `repository/`、`models/`、`schemas/` | 数据访问、ORM 和 Schema 基础，尚无译伴业务实体 |
 | `core/` | 数据库、缓存、队列模板及默认拒绝的权限占位依赖 |
 | `utils/`、`middleware/` | 继承的工具与可选中间件；并不等于所有模板能力已验收 |
-| `docker/`、`deploy/` | 教师的容器与进阶运维参考素材，本批未运行或部署 |
 | `tests/` | 无外部基础设施启动、权限占位拒绝及真实 HTTP 启动验收 |
 | `docs/` | 起步来源、逐文件差异及变更补丁 |
 
-后续保持 API → Service → Repository → Model，Schema 负责请求校验。API 不直接调用 Repository；跨表事务由业务流程统一控制，不能照搬按条 CRUD 自动提交的方式。模板工具、配置和部署素材按实际需要逐步适配。
+后续保持 API → Service → Repository → Model，Schema 负责请求校验。API 不直接调用 Repository；跨表事务由业务流程统一控制，不能照搬按条 CRUD 自动提交的方式。模板工具与配置按实际需要逐步适配。
 
 ## 配置与权限边界
 
-- `.env` 及运行日志、上传文件、数据库文件、虚拟环境不提交。示例配置与教学 Docker 示例不是真实凭据或生产配置。
+- `.env` 及运行日志、上传文件、数据库文件、虚拟环境不提交。示例配置不是真实凭据或生产配置。
 - `.env.example` 中的数据库、Redis、JWT 等字段属于继承的后续配置参考，当前启动不连接这些基础设施，也没有登录和签发会话端点。
 - `core.permissions` 保留必要导入名称，但权限依赖统一返回 HTTP 503，检查器不授予权限。兼容名称中的 `sso/teacher/student` 不代表译伴采用学校账号模型；真实实现须按 user、角色、属主与管理内容访问边界重写。
 - 教师密码/JWT、缓存、队列、部署与其他工具模块仍需后续专门验收；不能据文件存在声称业务或生产能力已完成。
 - 选择配置环境使用进程变量 `FASTAPI_ENV`，本次默认 development。真实数据库、角色、服务密钥及运行策略在对应里程碑接入，前端不保存服务端秘密。
 
-## 容器参考
+## 部署
 
-教师模板同时附带以下命令，供后续适配容器环境时使用；本批仅保留素材，未执行容器验收：
-
-```bash
-docker compose -f docker/docker-compose.yml up --build
-REDIS_HOST=redis docker compose -f docker/docker-compose.yml --profile redis up --build
-```
-
-Compose 中的 MySQL、可选 Redis 不属于本批本机启动依赖。`deploy/` 为进阶运维素材，其历史脚本和配置需要按实际部署调整；本批未启动监控、Nginx 或任何容器服务。
+起步阶段附带的容器与运维素材（`docker/`、`deploy/`）已作为教学参考裁剪移除，不再随仓库保留；来源与删除记录见 [来源记录](docs/starter-source.md)。后续部署方案按项目设计阶段确定，云服务器部署目标（G1）保留不变；本批未启动任何容器或运维服务。
 
 ## Git 与后续范围
 
