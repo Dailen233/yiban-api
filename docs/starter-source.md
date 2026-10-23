@@ -72,6 +72,6 @@ uv export --locked --no-dev --no-hashes --format requirements-txt --no-emit-proj
 
 - **日期**：2026-10-23。
 - **范围**：删除起步阶段附带的容器与运维教学素材——`docker/`（Dockerfile、docker-compose.yml、README.md，共 3 个文件）、`deploy/`（16 个文件）及根目录 `.dockerignore`；同步修订 `README.md` 与 `CODEBUDDY.md` 中相关现状表述。
-- **原因**：这些素材未接入运行链（无任何 `.py` 引用），首版不涉及容器、监控或运维部署，README 已声明「本批未运行或部署」；删除仅移除教学参考素材，不改变运行时代码、依赖清单或启动行为。
-- **实际验证**：`uv run --locked pytest -q` 6 passed；`git diff --check` 无空白错误；健康检查、文档入口、OpenAPI、无外部基础设施启动、权限占位默认拒绝等既有行为保持不变。
+- **原因**：这些教学容器与运维素材在当前初始化批次未启用，当前运行链不依赖它们；删除不改变运行时代码、依赖或启动行为，后续云服务器部署仍按 G1 和项目部署设计落实。
+- **实际验证**：`env -u DEBUG uv run --locked pytest -q`：6 passed，1 条上游弃用警告；`git diff --check` 无空白错误；健康检查、文档入口、OpenAPI、无外部基础设施启动、权限占位默认拒绝等既有行为保持不变。普通命令 `uv run --locked pytest -q` 曾受本机 `DEBUG=release` 环境变量影响而失败（`debug` 字段布尔解析冲突），该配置兼容问题留后续批次处理。
 - **快照边界**：本文件「来源」「初始化适配」「实际验证」各节，以及 `starter-manifest.json`、`starter-adjustments.patch` 描述的均为**首次提交时的快照**（65 个模板文件、逐文件散列与初始化差异），保持字节不变；本次裁剪不改变该快照追溯。原有初始化适配记录保持原貌。
