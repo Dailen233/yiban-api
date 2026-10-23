@@ -112,10 +112,23 @@ class BaseConfig(BaseSettings):
     # 安全基础配置
     # =================================================================
     allowed_hosts: List[str] = ["*"]
-    cors_origins: List[str] = ["*"]
+    # 凭据型 CORS 的精确 origin 白名单（不得 "*"）；与 trusted_origins 对齐
+    cors_origins: List[str] = [
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:8888",
+        "http://127.0.0.1:8888",
+    ]
     cors_allow_credentials: bool = True
     cors_allow_methods: List[str] = ["*"]
     cors_allow_headers: List[str] = ["*"]
+    # 写接口 CSRF/Origin 校验的可信来源白名单（精确匹配，不含通配符）
+    trusted_origins: List[str] = [
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:8888",
+        "http://127.0.0.1:8888",
+    ]
     
     # 速率限制
     rate_limit_enabled: bool = True
@@ -215,7 +228,7 @@ class BaseConfig(BaseSettings):
     
     @field_validator(
         "allowed_hosts", "cors_origins", "cors_allow_methods",
-        "cors_allow_headers", "allowed_file_extensions",
+        "cors_allow_headers", "trusted_origins", "allowed_file_extensions",
         "allowed_mime_types",
         mode="before",
     )

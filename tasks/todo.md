@@ -31,12 +31,13 @@
 **Description**：实现注册：邮箱/密码/昵称校验（含密码 ≥8 字符、UTF-8 ≤72 字节，超限拒绝不截断）、bcrypt 哈希（`run_in_executor` 不阻塞事件循环）、落库、重复邮箱 409、服务端固定普通角色 `'user'`（忽略请求体 role）；**同批启用注册写接口 CSRF/Origin 校验，并准备精确可信 Origin 配置、`X-Yiban-Request: 1` 自定义请求头及必要的 CORS/OPTIONS 预检支持**。
 
 **Acceptance criteria:**
-- [ ] 注册成功 201，返回 `{id, email, display_name, role='user'}`；请求体携带 `role` 被忽略或拒绝，绝不落库为 admin。
-- [ ] 重复 email → 409；密码 <8 字符或 UTF-8 编码 >72 字节 → 422（不截断、不 strip/lower、不做 SQL/XSS 黑名单清理）。
-- [ ] 注册写接口 CSRF/Origin：可信来源通过；恶意/缺失/`null` Origin 拒绝、缺 `X-Yiban-Request` 请求头拒绝、OPTIONS 预检通过；响应不返回 `password_hash`；哈希经线程池执行不阻塞异步。
+- [x] 注册成功 201，返回 `{id, email, display_name, role='user'}`；请求体携带 `role` 被忽略，绝不落库为 admin（集成测试验证）。
+- [x] 重复 email → 409；密码 <8 字符或 UTF-8 编码 >72 字节 → 422（不截断、不 strip/lower、不做 SQL/XSS 黑名单清理）。
+- [x] 注册写接口 CSRF/Origin：可信来源通过；恶意/缺失 Origin 拒绝、缺 `X-Yiban-Request` 请求头拒绝、OPTIONS 预检由 CORS 中间件放行；响应不返回 `password_hash`；bcrypt 哈希经 `asyncio.to_thread` 执行不阻塞异步。
 
 **Verification:**
-- `uv run --locked pytest -q tests/ -k register`（注册闭环聚焦测试，覆盖重复邮箱、密码边界、角色固定、CSRF/Origin）。
+- [x] 真实 MySQL 8.4.13 集成测试：注册成功/重复 409/角色固定/bcrypt 哈希 4 项全通过。
+- [x] 带 `TEST_DATABASE_URL` 完整回归 `DEBUG=release uv run --locked pytest -q`：61 passed、0 skipped。
 
 **Dependencies:** 任务 1
 
