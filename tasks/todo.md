@@ -80,8 +80,8 @@
 - [x] 管理端写接口 CSRF/Origin 复用（可信通过、缺失 403、预检通过）；`AUTH_ENABLED` 关闭时管理员三接口 503 且不新增会话；`require_admin` 单独依赖使用也先于数据库返回 503。
 
 **Verification:**
-- [x] `tests/test_admin_auth.py`（基础 11：503/CSRF/登录 200·401·403/Cookie/me/退出/OPTIONS）+ `tests/test_admin_auth_integration.py`（集成 12，真实 MySQL 8.4.13：闭环/角色校验/双端隔离/跨端错配/角色降级/会话持久化/撤销/关闭 503）+ `tests/test_create_admin.py`（CLI 4：创建/重复不覆盖/密码不一致/教师示例库拒绝）。
-- [x] 带 `TEST_DATABASE_URL` 完整回归 `DEBUG=release uv run --locked pytest -q`：135 passed、0 skipped。
+- [x] `tests/test_admin_auth.py`（基础 11：503/CSRF/登录 200·401·403/Cookie/me/退出/OPTIONS）+ `tests/test_admin_auth_integration.py`（集成 12，真实 MySQL 8.4.13：闭环/角色校验/双端隔离（同一 Cookie jar 保留两端 Cookie 直接退出，仅删本端 Cookie）/跨端错配/角色降级/会话持久化/撤销/关闭 503）+ `tests/test_create_admin.py`（CLI 5：创建/重复不覆盖/普通用户重复邮箱原账号不变/密码不一致/教师示例库拒绝）+ `tests/test_create_admin_unit.py`（异常注入 3：提交阶段重复键/其他完整性/写库失败的安全输出、非零退出、回滚与资源释放）。
+- [x] 带 `TEST_DATABASE_URL` 完整回归 `DEBUG=release uv run --locked pytest -q`：139 passed、0 skipped、1 warning（上游 Starlette TestClient 弃用）。
 
 **Dependencies:** 任务 3
 

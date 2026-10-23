@@ -78,6 +78,24 @@ def _fetch_user(email: str) -> User | None:
         return s.execute(select(User).where(User.email == email)).scalar_one_or_none()
 
 
+def _create_user(
+    email: str,
+    role: str = "user",
+    password: str = "userpassword1",
+    display_name: str = "U",
+) -> None:
+    with Session(create_engine(TEST_DATABASE_URL)) as s:
+        s.add(
+            User(
+                email=email,
+                password_hash=SecurityUtil.hash_password(password),
+                display_name=display_name,
+                role=role,
+            )
+        )
+        s.commit()
+
+
 def test_create_admin_creates_admin(prepared_schema):
     r = _run_cli(
         "cli-admin@test.com\nCLI Admin\npassword123\npassword123\n",
@@ -127,3 +145,22 @@ def test_create_admin_rejects_teacher_sample_db(prepared_schema):
     )
     assert r.returncode == 1
     assert "教师示例库" in r.stderr
+
+
+def test_create_admin_duplicate_existing_user_unchanged(prepared_schema):
+    """已有 role=user 账号，再用相同规范化邮箱创建管理员 → 失败且原账号不变。"""
+    _create_user("existing@test.com", role="user", password="userpassword1")
+    original = _fetch_user("existing@test.com")
+
+    # 相同邮箱（大小写 + 首尾空格）经规范化后命中已有账号
+    r = _run_cli(
+        "  EXISTING@TEST.COM \nExisting Admin\nadminpass123\nadminpass123\n",
+        TEST_DATABASE_URL,
+    )
+    assert r.returncode == 1
+    assert "已存在" in r.stderr
+
+    after = _fetch_user("existing@test.com")
+    assert after.id == original.id
+    assert after.role == "user"
+    assert after.password_hash == original.password_hash

@@ -15,6 +15,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from pydantic import ValidationError
 from sqlalchemy import create_engine, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from config import settings
@@ -37,8 +38,21 @@ def _validate(email: str, password: str, display_name: str) -> RegisterRequest |
         return None
 
 
+def _is_email_unique_conflict(exc: IntegrityError) -> bool:
+    """判断 IntegrityError 是否为 email 唯一约束冲突（MySQL 1062 Duplicate entry）。"""
+    orig = getattr(exc, "orig", None)
+    if orig is None:
+        return False
+    args = getattr(orig, "args", ())
+    if not args or args[0] != 1062:
+        return False
+    return "email" in str(args[1] if len(args) > 1 else args)
+
+
 def _create_admin(engine, payload: RegisterRequest) -> int:
-    with Session(engine) as session:
+    """写库创建管理员；失败回滚并输出安全提示，不泄露 SQL 参数/密码/哈希/URL。"""
+    session = Session(engine)
+    try:
         existing = session.execute(
             select(User).where(User.email == payload.email)
         ).scalar_one_or_none()
@@ -60,6 +74,19 @@ def _create_admin(engine, payload: RegisterRequest) -> int:
         session.commit()
         print(f"管理员已创建：{admin.email}（id={admin.id}，role={admin.role}）")
         return 0
+    except IntegrityError as exc:
+        session.rollback()
+        if _is_email_unique_conflict(exc):
+            print(f"邮箱 {payload.email} 已存在，未创建", file=sys.stderr)
+        else:
+            print("管理员创建失败：数据库完整性错误", file=sys.stderr)
+        return 1
+    except Exception:
+        session.rollback()
+        print("管理员创建失败：数据库写入错误", file=sys.stderr)
+        return 1
+    finally:
+        session.close()
 
 
 def main() -> int:

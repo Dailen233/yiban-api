@@ -221,10 +221,13 @@ def test_admin_logout_revokes_token_immediately(client):
 
 
 def test_dual_login_isolated_sessions(client):
-    """同一管理员同时登录两端：独立 Cookie/jti/会话，退出一端不影响另一端。"""
+    """同一管理员同时登录两端：独立 Cookie/jti/会话，退出一端不影响另一端。
+
+    保留同一 Cookie jar 直接退出，不 clear 也不手动补回另一端 Cookie。
+    """
     _create_user("dual@test.com", role="admin")
 
-    # 用户端登录
+    # 用户端登录（jar 保存 yiban_user_session）
     user_resp = client.post(
         "/api/v1/auth/login",
         json={"email": "dual@test.com", "password": "password123"},
@@ -232,16 +235,14 @@ def test_dual_login_isolated_sessions(client):
     )
     user_token = _extract_cookie(user_resp, "yiban_user_session")
 
-    # 管理端登录
+    # 管理端登录（同一 jar，两个 Cookie 共存）
     admin_resp = _admin_login(client, "dual@test.com")
     admin_token = _extract_cookie(admin_resp, "yiban_admin_session")
 
     assert user_token != admin_token
     assert len(_fetch_sessions("dual@test.com")) == 2
 
-    # 用户端退出 → 原 user token 立即 401，管理员 me 仍 200
-    client.cookies.clear()
-    client.cookies.set("yiban_user_session", user_token)
+    # 用户端退出：jar 仍带两个 Cookie，退出只清用户端 Cookie
     assert (
         client.post(
             "/api/v1/auth/logout",
@@ -249,23 +250,22 @@ def test_dual_login_isolated_sessions(client):
         ).status_code
         == 204
     )
-    client.cookies.set("yiban_user_session", user_token)
-    assert client.get("/api/v1/auth/me").status_code == 401
-    client.cookies.clear()
-    client.cookies.set("yiban_admin_session", admin_token)
+    # 仅用户端 Cookie 被删除，管理端 Cookie 保留
+    assert client.cookies.get("yiban_user_session") is None
+    assert client.cookies.get("yiban_admin_session") is not None
+    # 直接请求管理员 me（jar 自动带保留的管理员 Cookie）→ 仍 200
     assert client.get("/api/v1/admin/auth/me").status_code == 200
 
-    # 重新登录用户端 → 退出管理端 → 原 admin token 401，用户 me 仍 200
-    client.cookies.clear()
+    # 重新登录用户端（jar 新增用户 Cookie，管理员 Cookie 仍在）
     user_resp2 = client.post(
         "/api/v1/auth/login",
         json={"email": "dual@test.com", "password": "password123"},
         headers={"Origin": VALID_ORIGIN, "X-Yiban-Request": "1"},
     )
     user_token2 = _extract_cookie(user_resp2, "yiban_user_session")
+    assert user_token2 != admin_token
 
-    client.cookies.clear()
-    client.cookies.set("yiban_admin_session", admin_token)
+    # 退出管理端：jar 带两个 Cookie，退出只清管理端 Cookie
     assert (
         client.post(
             "/api/v1/admin/auth/logout",
@@ -273,10 +273,10 @@ def test_dual_login_isolated_sessions(client):
         ).status_code
         == 204
     )
-    client.cookies.set("yiban_admin_session", admin_token)
-    assert client.get("/api/v1/admin/auth/me").status_code == 401
-    client.cookies.clear()
-    client.cookies.set("yiban_user_session", user_token2)
+    # 仅管理端 Cookie 被删除，用户端 Cookie 保留
+    assert client.cookies.get("yiban_admin_session") is None
+    assert client.cookies.get("yiban_user_session") is not None
+    # 直接请求用户 me（jar 自动带保留的用户 Cookie）→ 仍 200
     assert client.get("/api/v1/auth/me").status_code == 200
 
 
