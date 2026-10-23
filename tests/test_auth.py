@@ -206,7 +206,7 @@ def test_me_returns_current_user(monkeypatch):
 
 
 class _LogoutService:
-    async def logout(self, token):
+    async def logout(self, token, aud="user"):
         return None
 
 

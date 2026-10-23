@@ -75,13 +75,13 @@
 **Description**：管理员受控创建（脚本/CLI，无公开注册、无默认密码）；`/admin/auth/*` 登录/me/退出；`require_admin` 服务端查库校验 `role='admin'`；双端通过 `session_type`/JWT `aud`/不同 Cookie 名绑定隔离；管理端写接口 CSRF/Origin 复用（可信 Origin + `X-Yiban-Request: 1`）。真实密钥校验已在任务 3 生效。
 
 **Acceptance criteria:**
-- [ ] 管理员登录仅 `role='admin'` 成功；普通用户访问 `/admin/*` 403（不信任客户端或旧 Token 角色）。
-- [ ] 用户端退出仅撤销 `session_type='user'` 对应会话，不误清管理员会话（反之亦然）；双端 Cookie/`aud`/`session_type` 绑定校验。
-- [ ] 管理端写接口 CSRF/Origin 复用（可信通过、恶意/缺失/null 拒绝、缺请求头拒绝、预检通过）。
+- [x] 管理员登录仅 `role='admin'` 成功；普通用户管理员登录 403（服务端查库校验，不信任客户端或 Token 角色快照）；管理员数据库角色降级后旧会话访问 `/admin/*` 403。
+- [x] 用户端退出仅撤销 `session_type='user'` 会话，不误清管理员会话（反之亦然）；双端独立 Cookie（`yiban_user_session`/`yiban_admin_session`）、`aud`（`user`/`admin`）、`session_type` 绑定校验；跨端 Token 错配 401。
+- [x] 管理端写接口 CSRF/Origin 复用（可信通过、缺失 403、预检通过）；`AUTH_ENABLED` 关闭时管理员三接口 503 且不新增会话；`require_admin` 单独依赖使用也先于数据库返回 503。
 
 **Verification:**
-- `uv run --locked pytest -q tests/ -k admin`（管理员与双端隔离聚焦测试）。
-- `uv run --locked pytest -q`（全量回归）。
+- [x] `tests/test_admin_auth.py`（基础 11：503/CSRF/登录 200·401·403/Cookie/me/退出/OPTIONS）+ `tests/test_admin_auth_integration.py`（集成 12，真实 MySQL 8.4.13：闭环/角色校验/双端隔离（同一 Cookie jar 保留两端 Cookie 直接退出，仅删本端 Cookie）/跨端错配/角色降级/会话持久化/撤销/关闭 503）+ `tests/test_create_admin.py`（CLI 5：创建/重复不覆盖/普通用户重复邮箱原账号不变/密码不一致/教师示例库拒绝）+ `tests/test_create_admin_unit.py`（异常注入 3：提交阶段重复键/其他完整性/写库失败的安全输出、非零退出、回滚与资源释放）。
+- [x] 带 `TEST_DATABASE_URL` 完整回归 `DEBUG=release uv run --locked pytest -q`：139 passed、0 skipped、1 warning（上游 Starlette TestClient 弃用）。
 
 **Dependencies:** 任务 3
 
@@ -95,7 +95,7 @@
 - [ ] 迁移可执行、可回滚（独立测试库）；注册闭环通过（重复邮箱、密码边界、角色固定、CSRF/Origin）。
 
 ## Checkpoint：任务 3-4 后
-- [ ] `uv run --locked pytest -q` 全绿；重复注册/错误凭据/过期/退出/越权/密钥校验/CSRF/双端隔离路径全部覆盖。
+- [x] `uv run --locked pytest -q` 全绿（135 passed、0 skipped）；重复注册/错误凭据/过期/退出/越权/密钥校验/CSRF/双端隔离路径全部覆盖。
 
 ## 后续任务（不在本批，记录边界）
 - 属主派生的真正落地（upload_file/task/book 的 `owner_id` 服务端注入）留到对应资源实现时验证。
