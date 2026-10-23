@@ -96,3 +96,20 @@ uv export --locked --no-dev --no-hashes --format requirements-txt --no-emit-proj
 - **根因**：`ProductionConfig` 的 `docs_url: None` / `redoc_url: None` / `openapi_url: None` 三个字段把 `None` 当作类型注解（NoneType）而非默认值，pydantic v2 下视为「必填字段」，直接实例化报三个 missing 错误。
 - **修复**：为三个字段补显式默认值 `None`（`docs_url: None = None` 等），保持原有 NoneType 约束及生产环境默认禁用文档的意图；`AppConfig.get_app_config()` 仍以 `getattr(settings, "docs_url", "/docs")` 读取，None 时 FastAPI 不挂载文档路由。
 - **验证**：`DEBUG=release uv run --locked pytest -q`：19 passed，1 条上游弃用警告。新增 `tests/test_production_config.py`（2 项）覆盖：production 无需显式传入文档字段即可实例化（三者均为 None、debug 默认 False），以及隔离子进程下真实应用入口可创建、`/health` 返回 bootstrap、`/docs` `/redoc` `/openapi.json` 返回 404（production 的 TrustedHostMiddleware 仅允许 localhost/127.0.0.1）。移除 `tests/test_debug_env_collision.py` 中为绕过此缺陷而显式传入三个 None 的辅助参数。
+
+## 账号数据库基础记录（任务 1）
+
+- **日期**：2026-10-23。范围仅 `tasks/todo.md` 任务 1（数据库基础 + User 模型 + 首个迁移）；注册/登录/JWT/会话/管理员留后续批次。
+- **实现**：
+  1. 新增默认关闭的 `database_enabled`（`config/config_unified.py`）：关闭时 bootstrap 无外部数据库依赖；启用后必须显式配置译伴 `DATABASE_URL`，缺失或仍指向教师示例库（含 `api_security`）明确报错，不回退教师示例库。
+  2. `core/database.py`：`create_database_pool` 连接测试失败时释放已建引擎、日志经 `_redact_url` 脱敏；`close_database_pool` 同时清理会话工厂；`app/factory.py` lifespan 仅在启用时初始化/释放连接资源，不 `create_all`、不自动迁移。
+  3. `models/user.py`：`user` 表（id VARCHAR(36) UUID PK、email VARCHAR(255) UNIQUE、password_hash VARCHAR(255)、display_name VARCHAR(100)、role VARCHAR(16) 默认 `'user'`、created_at/updated_at `DATETIME(6)` 无时区 UTC）；`normalize_email`（strip+lower）、`utcnow`（naive UTC）。逻辑 enum('user','admin') 落地为 VARCHAR(16)+应用层校验。
+  4. Alembic（1.20.1）+ `alembic/versions/0001_create_user_table.py`：模型与迁移同批落地；`alembic/env.py` 与运行时读同一套 `DATABASE_URL`（sync pymysql，运行时转 aiomysql）。
+  5. 基线测试修正：`tests/test_production_config.py` 子进程显式 `ALLOWED_HOSTS`（环境变量下 list 字段需 JSON 数组）与 `DATABASE_ENABLED=false`，不再依赖私有 `.env`；`tests/conftest.py` 显式 `DATABASE_ENABLED=false`。
+- **新增依赖**：`alembic>=1.13.0`（解析到 1.20.1，含 mako、markupsafe）；`uv.lock`/`requirements.txt` 同步更新。
+- **验证**：
+  - 基础测试（不接数据库）`DEBUG=release uv run --locked pytest -q`：**25 passed、4 skipped**、1 条上游弃用警告。新增 `tests/test_account_db.py`（6 项：email 规范化、naive UTC、User 物理结构、日志脱敏、教师示例库/缺失 URL 拒绝）。
+  - 迁移离线 SQL：`uv run alembic upgrade head --sql` 生成 `DEFAULT 'user'`、`UNIQUE(email)`、`DATETIME(6)`。
+  - **数据库集成验收阻塞**：本机无 MySQL 8.4 实例。已尝试并排除：docker daemon 运行但当前用户 `dailen` 不在 `docker` 组且 `/var/run/docker.sock` 为 `root:docker`（`docker ps` 报 permission denied）；`sudo -n` 需密码；`containerd`/`ctr` 可用但 `/run/containerd/containerd.sock` 为 `root:root`（`ctr` 同样 permission denied）；无 podman/rootless docker；无 mysql/mysqld 二进制；端口 3306–3308 无监听；本机 `.env` 指向教师示例库 `api_security_demo`（非译伴专用库）。`tests/test_account_db_integration.py`（4 项：upgrade/downgrade/upgrade、持久化+唯一约束+事务回滚、UTC 时间往返、应用启停）已编写并以 `skipif` 标记，未运行；**跳过不视为通过**，待具备译伴专用 MySQL 8.4 实例后执行。
+- **后续事项（本轮不实施）**：模板审查发现 `utils/audit.py` 模块级 `audit_logger = AuditLogger()` 在 `import app` 时即创建 `logs/audit/` 目录与两个 `RotatingFileHandler`（链：`app/middleware.py` → `middleware/__init__` → `audit_middleware` → `utils.audit`），即使审计中间件默认关闭；留待后续以惰性单例消除该导入副作用（副作用测试改用临时目录，不删除本机 logs/）。`passlib`/`aiosqlite` 依赖精简亦留后续，不混入本轮。
+- **边界**：本文件「来源」「初始化适配」各节及 `starter-manifest.json`、`starter-adjustments.patch` 保持字节不变，仅追加本记录。

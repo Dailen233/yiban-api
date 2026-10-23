@@ -8,6 +8,7 @@ from fastapi.middleware.trustedhost import TrustedHostMiddleware
 
 from api import register_routers
 from config import settings
+from core.database import close_database_pool, create_database_pool
 from utils.logger import get_logger, setup_logging
 
 from .config import AppConfig
@@ -20,15 +21,22 @@ logger = get_logger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    """基础工程不连接数据库、Redis 或启动任务队列。
+    """默认（database_enabled=False）不连接数据库、Redis 或任务队列。
 
-    模板的基础设施模块保留供后续适配，不把课堂内存队列当成真实后台任务。
+    启用数据库后仅初始化、释放连接资源；不执行 create_all 或自动迁移
+    （表结构由 Alembic 唯一管理）。
     """
     setup_logging(level=settings.log_level)
-    logger.info("译伴基础工程启动；业务基础设施尚未接入")
+    if settings.database_enabled:
+        await create_database_pool()
+        logger.info("译伴基础工程启动；数据库连接池已初始化")
+    else:
+        logger.info("译伴基础工程启动；业务基础设施尚未接入")
     try:
         yield
     finally:
+        if settings.database_enabled:
+            await close_database_pool()
         logger.info("译伴基础工程关闭")
 
 

@@ -53,6 +53,18 @@ def _to_async_url(database_url: str) -> str:
     return database_url
 
 
+def _redact_url(database_url: str) -> str:
+    """脱敏数据库 URL：仅保留 dialect + host + database，不泄露 user/password。"""
+    try:
+        from sqlalchemy.engine import make_url
+
+        parsed = make_url(database_url)
+        return f"{parsed.drivername}://{parsed.host}/{parsed.database}"
+    except Exception:
+        # 兜底：去掉 @ 之前（含 user:pass）的部分
+        return database_url.split("@")[-1] if "@" in database_url else database_url
+
+
 def _build_engine_kwargs() -> Dict[str, Any]:
     """构建异步引擎参数"""
     kw: Dict[str, Any] = {
@@ -84,39 +96,51 @@ def _build_engine_kwargs() -> Dict[str, Any]:
 
 
 async def create_database_pool() -> None:
-    """创建异步数据库连接池（在 lifespan 中调用）"""
+    """创建异步数据库连接池（仅在 lifespan 且 database_enabled 时调用）。
+
+    启用后必须显式配置译伴 DATABASE_URL，缺失或仍指向教师示例库时明确报错；
+    连接测试失败会释放已创建引擎，避免残留资源。
+    """
     global async_engine, AsyncSessionLocal
 
     database_url = getattr(settings, "database_url", None)
     if not database_url:
-        raise ValueError("数据库 URL 未配置 (settings.database_url)")
+        raise ValueError("数据库已启用但未配置 DATABASE_URL")
+    if "api_security" in database_url:
+        raise ValueError("不能使用教师示例库，请显式配置译伴 DATABASE_URL")
 
     async_url = _to_async_url(database_url)
     kwargs = _build_engine_kwargs()
 
-    async_engine = create_async_engine(async_url, **kwargs)
+    engine = create_async_engine(async_url, **kwargs)
+    try:
+        # 连接测试；失败时释放已创建引擎
+        async with engine.connect() as conn:
+            await conn.execute(text("SELECT 1"))
+    except Exception:
+        await engine.dispose()
+        raise
+
+    async_engine = engine
     AsyncSessionLocal = async_sessionmaker(
         async_engine, class_=AsyncSession, expire_on_commit=False
     )
-
-    # 连接测试
-    async with async_engine.connect() as conn:
-        await conn.execute(text("SELECT 1"))
 
     # 连接池事件监听（同步 DBAPI 层）
     @event.listens_for(async_engine.sync_engine, "connect")
     def _on_connect(dbapi_connection, connection_record):  # noqa: D401
         pool_stats["total_connections"] += 1
 
-    logger.info("异步数据库连接池创建成功: %s", async_url.split("@")[-1] if "@" in async_url else async_url)
+    logger.info("异步数据库连接池创建成功: %s", _redact_url(async_url))
 
 
 async def close_database_pool() -> None:
-    """关闭异步数据库连接池"""
-    global async_engine
+    """关闭异步数据库连接池；同时清理会话工厂，避免残留失效引用。"""
+    global async_engine, AsyncSessionLocal
     if async_engine is not None:
         await async_engine.dispose()
         async_engine = None
+        AsyncSessionLocal = None
         logger.info("异步数据库连接池已关闭")
 
 
