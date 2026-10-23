@@ -18,6 +18,8 @@ class RegisterRequest(BaseModel):
         email = v.strip().lower()
         if not email or not EMAIL_PATTERN.match(email):
             raise ValueError("邮箱格式不正确")
+        if len(email) > 255:
+            raise ValueError("邮箱长度不得超过 255 字符")
         return email
 
     @field_validator("password")

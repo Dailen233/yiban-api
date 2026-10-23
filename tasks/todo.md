@@ -36,8 +36,9 @@
 - [x] 注册写接口 CSRF/Origin：可信来源通过；恶意/缺失 Origin 拒绝、缺 `X-Yiban-Request` 请求头拒绝、OPTIONS 预检由 CORS 中间件放行；响应不返回 `password_hash`；bcrypt 哈希经 `asyncio.to_thread` 执行不阻塞异步。
 
 **Verification:**
-- [x] 真实 MySQL 8.4.13 集成测试：注册成功/重复 409/角色固定/bcrypt 哈希 4 项全通过。
-- [x] 带 `TEST_DATABASE_URL` 完整回归 `DEBUG=release uv run --locked pytest -q`：61 passed、0 skipped。
+- [x] 真实 MySQL 8.4.13 集成测试：注册成功/重复 409/角色固定/bcrypt 哈希 5 项全通过（含并发同邮箱仅一条成功、另一条 409）。
+- [x] 带 `TEST_DATABASE_URL` 完整回归 `DEBUG=release uv run --locked pytest -q`：72 passed、0 skipped。
+- [x] 修正：并发重复注册（写入/flush/commit 同处异常边界，仅 email 唯一冲突转 409）；校验响应不回显原始输入（防密码泄露）；邮箱规范化后 ≤255 字符。HTTP 层补充非法 body 422、Origin=null 403、OPTIONS 预检 200。
 
 **Dependencies:** 任务 1
 

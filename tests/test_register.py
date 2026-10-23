@@ -2,16 +2,19 @@
 
 import asyncio
 
+import pymysql
 import pytest
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
+from sqlalchemy.exc import IntegrityError
 from starlette.requests import Request
 
 from app import create_app
 from config import settings
 from core.csrf import require_trusted_origin
 from schemas.auth import RegisterRequest
+from service.auth_service import _is_email_unique_conflict
 
 VALID_ORIGIN = "http://localhost:5173"
 
@@ -147,3 +150,116 @@ def test_trusted_origins_are_explicit():
 
 def test_cors_origins_are_explicit():
     assert settings.cors_origins and "*" not in settings.cors_origins
+
+
+# ---- 邮箱长度边界（与 user.email VARCHAR(255) 一致）----
+
+def test_register_request_accepts_255_char_email():
+    email = "a" * 243 + "@example.com"  # 255 字符
+    r = RegisterRequest(email=email, password="password123", display_name="A")
+    assert len(r.email) == 255
+
+
+def test_register_request_rejects_email_over_255_chars():
+    email = "a" * 244 + "@example.com"  # 256 字符
+    with pytest.raises(ValidationError):
+        RegisterRequest(email=email, password="password123", display_name="A")
+
+
+# ---- 邮箱唯一冲突识别（修正 1）----
+
+def test_is_email_unique_conflict_recognizes_email():
+    orig = pymysql.err.IntegrityError(1062, "Duplicate entry 'x' for key 'user.email'")
+    exc = IntegrityError("INSERT", {}, orig)
+    assert _is_email_unique_conflict(exc) is True
+
+
+def test_is_email_unique_conflict_rejects_other_unique_keys():
+    orig = pymysql.err.IntegrityError(1062, "Duplicate entry 'x' for key 'user.id'")
+    exc = IntegrityError("INSERT", {}, orig)
+    assert _is_email_unique_conflict(exc) is False
+
+
+def test_is_email_unique_conflict_rejects_other_error_codes():
+    orig = pymysql.err.IntegrityError(1048, "Column 'display_name' cannot be null")
+    exc = IntegrityError("INSERT", {}, orig)
+    assert _is_email_unique_conflict(exc) is False
+
+
+# ---- HTTP 层验证（依赖替换，不连数据库）----
+
+def _client_with_mock_service() -> TestClient:
+    """替换 get_auth_service，使请求进入 body 校验而不触发数据库。"""
+    from service.dependencies import get_auth_service
+
+    app = create_app()
+
+    class _DummyService:
+        async def register(self, payload):
+            raise AssertionError("依赖替换后不应到达 service")
+
+    async def override():
+        return _DummyService()
+
+    app.dependency_overrides[get_auth_service] = override
+    return TestClient(app, base_url="http://localhost")
+
+
+def test_register_invalid_body_returns_422():
+    """非法请求体（短密码）经 HTTP 层返回 422。"""
+    client = _client_with_mock_service()
+    r = client.post(
+        "/api/v1/auth/register",
+        json=_payload(password="short"),
+        headers={"Origin": VALID_ORIGIN, "X-Yiban-Request": "1"},
+    )
+    assert r.status_code == 422
+
+
+def test_register_validation_does_not_leak_password():
+    """密码本身不合格 → 422 响应不回显明文密码。"""
+    client = _client_with_mock_service()
+    r = client.post(
+        "/api/v1/auth/register",
+        json=_payload(password="short"),
+        headers={"Origin": VALID_ORIGIN, "X-Yiban-Request": "1"},
+    )
+    assert r.status_code == 422
+    assert "short" not in r.text
+
+
+def test_register_validation_does_not_leak_password_when_missing_fields():
+    """缺少其他必填字段但携带密码时，input 为整个请求对象，不得回显密码。"""
+    client = _client_with_mock_service()
+    r = client.post(
+        "/api/v1/auth/register",
+        json={"password": "secret-pass-123"},
+        headers={"Origin": VALID_ORIGIN, "X-Yiban-Request": "1"},
+    )
+    assert r.status_code == 422
+    assert "secret-pass-123" not in r.text
+
+
+def test_register_rejects_null_origin():
+    """Origin=null 被拒（403）。"""
+    r = _client().post(
+        "/api/v1/auth/register",
+        json=_payload(),
+        headers={"Origin": "null", "X-Yiban-Request": "1"},
+    )
+    assert r.status_code == 403
+
+
+def test_register_options_preflight_passes():
+    """合法 OPTIONS 预检由 CORS 中间件放行。"""
+    client = _client()
+    r = client.options(
+        "/api/v1/auth/register",
+        headers={
+            "Origin": VALID_ORIGIN,
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "x-yiban-request, content-type",
+        },
+    )
+    assert r.status_code == 200
+    assert r.headers.get("access-control-allow-origin") == VALID_ORIGIN

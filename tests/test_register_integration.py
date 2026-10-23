@@ -133,3 +133,37 @@ def test_register_stores_bcrypt_hash(client):
     hashed = _fetch_password_hash("hash@test.com")
     assert hashed != "password123"
     assert bcrypt.checkpw(b"password123", hashed.encode())
+
+
+@pytest.mark.asyncio
+async def test_register_concurrent_same_email_only_one_succeeds(prepared_schema):
+    """同邮箱并发注册：仅一条成功、另一条 409，最终只有一条记录。"""
+    from schemas.auth import RegisterRequest, RegisterResponse
+    from service.auth_service import AuthService
+    from utils.custom_exceptions import ConflictException
+
+    engine = create_async_engine(db._to_async_url(TEST_DATABASE_URL))
+    Session = async_sessionmaker(engine, expire_on_commit=False)
+
+    payload = RegisterRequest(
+        email="race@test.com", password="password123", display_name="Race"
+    )
+
+    async def _attempt():
+        async with Session() as session:
+            return await AuthService(session).register(payload)
+
+    results = await asyncio.gather(_attempt(), _attempt(), return_exceptions=True)
+
+    successes = [r for r in results if isinstance(r, RegisterResponse)]
+    conflicts = [r for r in results if isinstance(r, ConflictException)]
+    assert len(successes) == 1, f"期望 1 成功，实际 {results}"
+    assert len(conflicts) == 1, f"期望 1 冲突，实际 {results}"
+
+    async with Session() as session:
+        rows = (
+            await session.execute(select(User).where(User.email == "race@test.com"))
+        ).scalars().all()
+        assert len(rows) == 1
+
+    await engine.dispose()
