@@ -664,9 +664,9 @@ class ProductionConfig(BaseConfig):
     # =================================================================
     # API文档配置 - 生产环境
     # =================================================================
-    docs_url: None  # 生产环境禁用文档
-    redoc_url: None
-    openapi_url: None
+    docs_url: None = None  # 生产环境禁用文档
+    redoc_url: None = None
+    openapi_url: None = None
     
     # =================================================================
     # 性能配置 - 生产环境
