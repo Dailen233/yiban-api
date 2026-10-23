@@ -50,7 +50,7 @@
 
 ## 任务 3：用户登录/me/退出、会话与鉴权闭环
 
-**Description**：实现 `user_session` 模型 + 迁移；登录签发 JWT（`sub`/`aud=user`/`role` 快照/`jti`/`exp`）并写 `user_session`；**真实签名密钥校验在任务 3 生效（任何真实 JWT 签发前）**；`get_current_user` 真实实现（每次鉴权同时验证 JWT 签名与 `exp`、`session.user_id == JWT.sub`、`session.jti == JWT.jti`、`user_session` 存在且未过期未撤销、`user` 存在，并校验 `aud`/`session_type`/端点绑定）；退出置 `revoked_at` 立即失效；登录/退出写接口 CSRF/Origin（复用并扩展任务 2 的可信 Origin 校验与 `X-Yiban-Request` 请求头）、httpOnly cookie、凭据型 CORS 显式 origin 配置在本批生效。
+**Description**：实现 `user_session` 模型 + 迁移；登录签发 JWT（`sub`/`jti`/`aud=user`/`exp`，不含角色快照，身份与角色以服务端查库为准）并写 `user_session`；**真实签名密钥校验在任务 3 生效（任何真实 JWT 签发前）**；`get_current_user` 真实实现（每次鉴权同时验证 JWT 签名与 `exp`、`session.user_id == JWT.sub`、`session.jti == JWT.jti`、`user_session` 存在且未过期未撤销、`user` 存在，并校验 `aud`/`session_type`/端点绑定）；退出置 `revoked_at` 立即失效；登录/退出写接口 CSRF/Origin（复用并扩展任务 2 的可信 Origin 校验与 `X-Yiban-Request` 请求头）、httpOnly cookie、凭据型 CORS 显式 origin 配置在本批生效。
 
 **Acceptance criteria:**
 - [x] 登录签发 JWT（`sub`/`jti`/`aud=user`/`exp`，无角色快照）+ 写 `user_session(session_type='user')`；JWT `exp` 与 `session.expires_at` 由同一 UTC 到期时刻产生（`expires_at` 存 DATETIME(6) 微秒、`exp` 由 PyJWT 编码时秒级截断）；过期/伪造/已撤销 token 均 401；退出后原 token 立即 401。

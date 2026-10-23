@@ -12,7 +12,7 @@
 
 ## 起步与实现范围
 
-本次来源为教师 Skills 压缩包中的 `sql-to-fastapi-restfulapi-scaffold/resources/templates/project_structure/`。这是基于模板适配的起步工程，来源、原文差异和散列在 docs。当前已有基础 HTTP、日志、OpenAPI 与健康检查，并落地账号数据库基础（`user` 模型 + Alembic 迁移，数据库默认关闭）与可显式启用的用户鉴权（`AUTH_ENABLED`，默认关闭）；管理员鉴权与其余业务链路仍未接入。
+本次来源为教师 Skills 压缩包中的 `sql-to-fastapi-restfulapi-scaffold/resources/templates/project_structure/`。这是基于模板适配的起步工程，来源、原文差异和散列在 docs。当前已有基础 HTTP、日志、OpenAPI 与健康检查，并落地账号数据库基础（`user` 模型 + Alembic 迁移，数据库默认关闭）；用户鉴权与管理端鉴权均已实现（`AUTH_ENABLED`，默认关闭），上传、翻译、任务、书库和导出尚未实现。
 
 Python 3.12、uv、FastAPI、Pydantic 2 与 SQLAlchemy 的框架基础沿用起步项目。先按 uv.lock 安装，不因教师队列等模板素材存在而预先定案数据库、异步机制或生产架构。业务按用户明确批次推进，不将本次初始化边界当成永久禁令。
 
