@@ -4,7 +4,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request, Response, status
 
-from config import settings
+from core.cookies import delete_session_cookie, set_session_cookie
 from core.csrf import require_trusted_origin
 from core.permissions import USER_SESSION_COOKIE, get_current_user, require_auth_enabled
 from models.user import User
@@ -13,26 +13,6 @@ from service.auth_service import AuthService
 from service.dependencies import get_auth_service
 
 router = APIRouter(prefix="/auth", tags=["认证"])
-
-
-def _cookie_secure() -> bool:
-    """生产环境 Cookie 必须 Secure；本地 HTTP 开发豁免。"""
-    return settings.environment == "production"
-
-
-def _set_session_cookie(response: Response, token: str) -> None:
-    response.set_cookie(
-        key=USER_SESSION_COOKIE,
-        value=token,
-        httponly=True,
-        samesite="lax",
-        secure=_cookie_secure(),
-        path="/",
-    )
-
-
-def _delete_session_cookie(response: Response) -> None:
-    response.delete_cookie(key=USER_SESSION_COOKIE, path="/")
 
 
 @router.post(
@@ -61,7 +41,7 @@ async def login(
 ) -> UserResponse:
     """登录：签发 JWT + 持久化会话，设置用户 Cookie；响应不回传 JWT。"""
     user, token = await auth_service.login(payload)
-    _set_session_cookie(response, token)
+    set_session_cookie(response, USER_SESSION_COOKIE, token)
     return user
 
 
@@ -91,5 +71,5 @@ async def logout(
 ) -> None:
     """退出：撤销会话 jti + 清除 Cookie，返回 204。"""
     token = request.cookies.get(USER_SESSION_COOKIE, "")
-    await auth_service.logout(token)
-    _delete_session_cookie(response)
+    await auth_service.logout(token, aud="user")
+    delete_session_cookie(response, USER_SESSION_COOKIE)

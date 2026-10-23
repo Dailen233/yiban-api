@@ -81,10 +81,29 @@ class AuthService:
         )
 
     async def login(self, payload: LoginRequest) -> tuple[UserResponse, str]:
+        """用户端登录（aud=user, session_type=user）。"""
+        return await self._login(payload, aud="user", session_type="user")
+
+    async def admin_login(self, payload: LoginRequest) -> tuple[UserResponse, str]:
+        """管理员登录（aud=admin, session_type=admin，role 必须为 admin）。"""
+        return await self._login(
+            payload, aud="admin", session_type="admin", require_admin=True
+        )
+
+    async def _login(
+        self,
+        payload: LoginRequest,
+        aud: str,
+        session_type: str,
+        require_admin: bool = False,
+    ) -> tuple[UserResponse, str]:
         """登录：查库验密码（不泄露账号存在性），签发 JWT + 持久化会话。"""
         if not settings.auth_enabled:
             # 服务层防御：开关关闭不得绕过路由签发真实会话
-            raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="鉴权服务未启用")
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="鉴权服务未启用",
+            )
         email = normalize_email(payload.email)
         user = await self.user_repo.get_by_email(email)
         if user is None:
@@ -95,18 +114,23 @@ class AuthService:
         )
         if not valid:
             raise AuthenticationException("邮箱或密码错误")
+        if require_admin and user.role != "admin":
+            # 凭据正确但角色不是 admin → 403
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN, detail="需要管理员权限"
+            )
 
         jti = str(uuid.uuid4())
         expires_at = datetime.now(timezone.utc) + timedelta(
             minutes=settings.access_token_expire_minutes
         )
         token = create_session_token(
-            sub=user.id, jti=jti, aud="user", expires_at=expires_at
+            sub=user.id, jti=jti, aud=aud, expires_at=expires_at
         )
         session = UserSession(
             user_id=user.id,
             jti=jti,
-            session_type="user",
+            session_type=session_type,
             expires_at=expires_at,
         )
         await self.session_repo.create(session)
@@ -122,9 +146,9 @@ class AuthService:
             token,
         )
 
-    async def logout(self, token: str) -> None:
-        """退出：撤销当前会话 jti（幂等）。"""
-        payload = decode_session_token(token, aud="user")
+    async def logout(self, token: str, aud: str = "user") -> None:
+        """退出：撤销当前会话 jti（幂等，按端别 aud 验签）。"""
+        payload = decode_session_token(token, aud=aud)
         jti = str(payload.get("jti") or "")
         session = await self.session_repo.get_by_jti(jti)
         if session is not None and session.revoked_at is None:
