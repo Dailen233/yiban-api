@@ -35,7 +35,7 @@ def _api_lines(
 ) -> list[str]:
     url = f"mysql+pymysql://{db_user}:{db_password}@127.0.0.1:{db_port}/{db}?charset=utf8mb4"
     if cors is None:
-        cors = '["http://localhost:5173","http://localhost:5174"]'
+        cors = '["http://localhost:5173","http://localhost:5174","http://localhost:5175"]'
     return [
         "FASTAPI_ENV=development",
         "DATABASE_ENABLED=true",

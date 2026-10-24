@@ -2,7 +2,7 @@
 
 仅输出状态码与必要身份字段；不打印请求密码、Cookie 值、Set-Cookie 原文、JWT
 或带凭据 URL。使用随机邮箱与随机密码；覆盖 /health、注册→登录→me→退出→再次
-me(401) 与两个预留前端 Origin 的 CORS 预检。
+me(401) 与三个预留前端 Origin 的 CORS 预检。
 
 运行（后端已启动后）：
     uv run --env-file .env.dev-api --locked python scripts/smoke_local.py
@@ -14,7 +14,11 @@ import sys
 import httpx
 
 BASE_URL = "http://localhost:8001"
-ORIGINS = ["http://localhost:5173", "http://localhost:5174"]
+ORIGINS = [
+    "http://localhost:5173",
+    "http://localhost:5174",
+    "http://localhost:5175",
+]
 
 
 def _rand_email() -> str:

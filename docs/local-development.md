@@ -24,6 +24,10 @@ cd ~/projects/yiban-api
 uv run python scripts/setup_local_dev.py
 ```
 
+### 已有两地址配置的迁移（新增管理端 5175）
+
+若 `.env.dev-api` 是接入管理端之前的旧配置（`CORS_ORIGINS`、`TRUSTED_ORIGINS` 仅含 `http://localhost:5173`、`http://localhost:5174`），无需重新生成数据库密码或 JWT 密钥：手动在两个 JSON 数组末尾追加 `"http://localhost:5175"`（保留外层单引号），保存后重启后端即可。脚本再次运行会复用现有文件并校验通过，不覆盖凭据、不重新生成密钥。
+
 ## 2. 启动开发库
 
 Docker 需要 root 权限时，由你在终端输入 sudo 密码（密码不写入命令）：
@@ -45,7 +49,7 @@ uv run --env-file .env.dev-api --locked python -c \
    print('trusted=', settings.trusted_origins)"
 ```
 
-预期 `db=yiban_api_dev`、`enabled=True True`、`env=development`、Origin 为两个预留前端地址。
+预期 `db=yiban_api_dev`、`enabled=True True`、`env=development`、Origin 为三个预留前端地址（用户端 5174、管理端 5175 及预留 5173）。
 
 ## 3. 迁移（仅对开发库）
 
@@ -66,7 +70,7 @@ uv run --env-file .env.dev-api --locked uvicorn start:app --host 127.0.0.1 --por
 
 ## 5. 安全冒烟（httpx 内存 Cookie jar，不打印 JWT/密码/Cookie）
 
-使用 `scripts/smoke_local.py`：随机邮箱与随机密码，仅输出状态码、必要身份字段与检查结果；不输出请求密码、Cookie 值、Set-Cookie 原文、JWT 或带凭据 URL。覆盖 `/health`、注册→登录→me→退出→再次 me(401) 与两个预留 Origin 的 CORS 预检。
+使用 `scripts/smoke_local.py`：随机邮箱与随机密码，仅输出状态码、必要身份字段与检查结果；不输出请求密码、Cookie 值、Set-Cookie 原文、JWT 或带凭据 URL。覆盖 `/health`、注册→登录→me→退出→再次 me(401) 与三个预留 Origin 的 CORS 预检。
 
 ```bash
 uv run --env-file .env.dev-api --locked python scripts/smoke_local.py
@@ -83,6 +87,7 @@ logout -> 204
 me after logout -> 401
 OPTIONS http://localhost:5173 -> 200 allow=http://localhost:5173
 OPTIONS http://localhost:5174 -> 200 allow=http://localhost:5174
+OPTIONS http://localhost:5175 -> 200 allow=http://localhost:5175
 SMOKE_OK: 冒烟全部通过
 ```
 
