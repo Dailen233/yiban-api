@@ -1,0 +1,28 @@
+# 译伴专用 MySQL 8.4 本地开发实例（仅本机监听，与测试实例资源隔离）。
+# 凭据来自被 Git 忽略的 .env.dev-db（随机生成，脚本 scripts/setup_local_dev.py 生成）。
+# 启动（需 sudo 输入密码，密码不写入命令）：
+#   sudo docker compose -f docker-compose.dev.yml --env-file .env.dev-db up -d
+# 项目名 yiban-api-dev、容器 yiban-mysql-84-dev、数据卷 yiban_mysql_dev_data、端口 3307，
+# 与测试实例（默认项目名 yiban-api / 容器 yiban-mysql-84-test / 卷 yiban_mysql_test_data / 3308）互不影响。
+name: yiban-api-dev
+services:
+  mysql84:
+    image: mysql:8.4
+    container_name: yiban-mysql-84-dev
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${MYSQL_PORT:-3307}:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-yiban_api_dev}
+      MYSQL_USER: ${MYSQL_USER:-yiban}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?}
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+      - --default-time-zone=+00:00
+    volumes:
+      - yiban_mysql_dev_data:/var/lib/mysql
+
+volumes:
+  yiban_mysql_dev_data:
