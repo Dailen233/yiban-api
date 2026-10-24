@@ -2,14 +2,13 @@
 
 分层约定：
 - database / cache / queue：运行时基础设施（lifespan 初始化）
-- security：密码 / JWT 薄封装（实现在 utils）
-- permissions：鉴权尚未接入时默认拒绝的占位 Depends
+- token / permissions：会话 JWT（固定 HS256）与鉴权依赖；密码哈希在 utils.security
 - 服务工厂：``service.dependencies``（勿再放 core）
 
 推荐显式导入，例如::
 
     from core.database import get_async_session
-    from core.permissions import get_current_active_user, require_admin
+    from core.permissions import get_current_user, require_admin
 """
 
 from .database import (
@@ -35,12 +34,6 @@ from .queue import (
     task_queue,
     start_queue,
     stop_queue,
-)
-from .security import (
-    SecurityHelper,
-    get_password_hash,
-    verify_password,
-    create_access_token,
 )
 from .permissions import (
     get_current_user,
@@ -71,10 +64,6 @@ __all__ = [
     "task_queue",
     "start_queue",
     "stop_queue",
-    "SecurityHelper",
-    "get_password_hash",
-    "verify_password",
-    "create_access_token",
     "get_current_user",
     "get_current_sso_user",
     "get_current_active_user",

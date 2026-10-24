@@ -42,7 +42,8 @@ def test_bootstrap_does_not_start_external_services(monkeypatch):
         }
         assert client.get("/docs").status_code == 200
         schema = client.get("/openapi.json").json()
-        assert set(schema["paths"]) == {"/health"}
+        assert "/health" in schema["paths"]
+        assert "/api/v1/auth/register" in schema["paths"]
         assert database.async_engine is None
         assert cache.cache_manager.backend_type == "uninitialized"
 

@@ -46,7 +46,6 @@ def setup_exception_handlers(app: FastAPI) -> None:
                 ValidationErrorDetail(
                     field=field,
                     message=error["msg"],
-                    value=error.get("input"),
                 )
             )
         logger.warning("Validation error path=%s", request.url.path)

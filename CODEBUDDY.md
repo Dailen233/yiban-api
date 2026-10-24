@@ -12,11 +12,11 @@
 
 ## 起步与实现范围
 
-本次来源为教师 Skills 压缩包中的 `sql-to-fastapi-restfulapi-scaffold/resources/templates/project_structure/`。这是基于模板适配的起步工程，来源、原文差异和散列在 docs。当前只有基础 HTTP、日志、OpenAPI 与健康检查；无业务实体、DDL、迁移或真实鉴权。
+本次来源为教师 Skills 压缩包中的 `sql-to-fastapi-restfulapi-scaffold/resources/templates/project_structure/`。这是基于模板适配的起步工程，来源、原文差异和散列在 docs。当前已有基础 HTTP、日志、OpenAPI 与健康检查，并落地账号数据库基础（`user` 模型 + Alembic 迁移，数据库默认关闭）；用户鉴权与管理端鉴权均已实现（`AUTH_ENABLED`，默认关闭），上传、翻译、任务、书库和导出尚未实现。
 
-Python 3.12、uv、FastAPI、Pydantic 2 与 SQLAlchemy 的框架基础沿用起步项目。先按 uv.lock 安装，不因教师 Docker/队列素材存在而预先定案数据库、异步机制或生产架构。业务按用户明确批次推进，不将本次初始化边界当成永久禁令。
+Python 3.12、uv、FastAPI、Pydantic 2 与 SQLAlchemy 的框架基础沿用起步项目。先按 uv.lock 安装，不因教师队列等模板素材存在而预先定案数据库、异步机制或生产架构。业务按用户明确批次推进，不将本次初始化边界当成永久禁令。
 
-默认生命周期不连接数据库、Redis或启动内存队列。健康为 bootstrap 不代表业务或数据就绪。权限占位依赖默认拒绝；不得将其改为无条件通过、接受固定测试 Token 或使用 localStorage 标记充当真实权限。
+默认生命周期不连接数据库（`DATABASE_ENABLED=false`）、Redis或启动内存队列；启用数据库须显式配置译伴 `DATABASE_URL`，教师示例库（`api_security_*` 前缀）按库名结构化拒绝（`make_url` 解析，非整 URL 子串判断）；表结构由 Alembic 唯一管理、lifespan 不执行 create_all 或自动迁移；MySQL 8.4 默认 caching_sha2_password 认证，依赖含 `cryptography`。数据库集成测试只读 `TEST_DATABASE_URL` 并校验目标库名必须为 `yiban_api_test`，非译伴专用测试库拒绝执行迁移/写入。健康为 bootstrap 不代表业务或数据就绪。未实现权限入口（`get_current_active_user`/`require_teacher`/`require_student`）默认拒绝；不得将其改为无条件通过、接受固定测试 Token 或使用 localStorage 标记充当真实权限。注册接口 `POST /api/v1/auth/register` 服务端固定 `role='user'`（忽略请求体 role）；密码 ≥8 字符且 UTF-8 ≤72 字节（超限拒绝不截断），bcrypt 哈希经 `asyncio.to_thread` 落库，重复 email 返回 409，响应绝不返回 `password_hash`。写接口 CSRF/Origin：`Origin` 精确匹配 `trusted_origins` 且携带 `X-Yiban-Request: 1`，缺失/不可信均 403（OPTIONS 预检由 CORS 中间件放行）；`cors_origins` 为显式白名单（凭据型 CORS 不得 `*`）。登录/me/退出：JWT 仅 HS256（`sub`/`jti`/`aud=user`/`exp`，不含角色快照），签发与验签统一用 `effective_jwt_secret_key` 并在启动阶段校验（拒绝空值/短密钥 <32 字节/教学默认值/`${...}` 占位符，不回退弱密钥）；`AUTH_ENABLED` 默认关闭（关闭时 login/me/logout 均返回 503，不签发/接受会话，检查先于数据库访问）；启用要求数据库已启用且密钥校验通过。每次鉴权验签后必须查库验证 `user_session` 存在且未撤销未过期、`jti`/`sub`/`aud=user`/`session_type=user` 一致、用户存在，身份与角色以数据库记录为准；退出置 `revoked_at` 立即失效。用户 Cookie `yiban_user_session` 必须 HttpOnly + SameSite=Lax + Secure（生产，开发 localhost 豁免）；`require_admin` 已真实实现（管理员会话 Cookie `yiban_admin_session` + `aud=admin` + `session_type=admin` + 查库 `role='admin'`，角色降级后 403）；`get_current_active_user`/`require_teacher`/`require_student` 等未接入权限入口继续默认拒绝。管理员端 `/admin/auth/*` 登录/me/退出复用上述鉴权，双端独立 Cookie/jti/会话、退出一端不撤销另一端、跨端 Token 错配 401；管理员登录先验凭据再查 role（凭据错 401、角色非 admin 403）；管理员创建仅受控 CLI `scripts/create_admin.py`（getpass 隐藏输入、复用注册校验、教师示例库拒绝、重复邮箱不覆盖；写库失败回滚并仅输出安全提示，不泄露 SQL 参数/密码/哈希/堆栈/带凭据 URL）。
 
 ## 分层与数据规则
 
@@ -39,6 +39,6 @@ Python 3.12、uv、FastAPI、Pydantic 2 与 SQLAlchemy 的框架基础沿用起�
 
 Gitee origin 为 PR 合并入口，GitHub github 镜像相同提交。master 稳定、develop 集成，从 develop 建 feature/fix/docs 分支。单人自查，不虚构第二审批人或 CI；保护设置以平台实际配置为准。保留根提交，不强推、不覆盖未提交工作，关联 PingCode 实际任务编号。
 
-验证使用 `uv sync --locked` 与 `uv run --locked pytest -q`。测试覆盖基础生命周期、默认拒绝与真实 Uvicorn HTTP；不表述为真实鉴权或业务验收。仅改 Markdown 时检查差异和来源即可，不重复构建。依赖、配置或启动改动运行对应检查；继承的未验收模块按功能逐步验证。
+验证使用 `uv sync --locked` 与 `uv run --locked pytest -q`。测试覆盖基础生命周期、权限默认拒绝、真实 Uvicorn HTTP、账号（注册/登录/me/退出/管理员/双端隔离）与 MySQL 集成验收；账号后端已验收，但上传/翻译/任务/书库等业务未实现，不表述为整书业务完成。仅改 Markdown 时检查差异和来源即可，不重复构建。依赖、配置或启动改动运行对应检查；继承的未验收模块按功能逐步验证。
 
-汇报修改文件、行为、实际检查、限制，以及提交、推送、合并、部署的真实状态。模板中的 docker/deploy 为参考，未授权时不启动新服务、连接现有项目数据库或执行初始化 SQL。
+汇报修改文件、行为、实际检查、限制，以及提交、推送、合并、部署的真实状态。起步附带的容器/运维教学素材已裁剪移除；未授权时不启动新服务、连接现有项目数据库或执行初始化 SQL。

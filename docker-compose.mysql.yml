@@ -1,0 +1,25 @@
+# 译伴专用 MySQL 8.4 本地测试实例（仅本机监听，开发/测试资源隔离）。
+# 凭据来自被 Git 忽略的 .env.test-db（随机生成），示例 .env.docker 仅占位。
+# 启动（需 sudo 输入密码，密码不写入命令）：
+#   sudo docker compose --env-file .env.test-db -f docker-compose.mysql.yml up -d
+services:
+  mysql84:
+    image: mysql:8.4
+    container_name: yiban-mysql-84-test
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${MYSQL_PORT:-3308}:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-yiban_api_test}
+      MYSQL_USER: ${MYSQL_USER:-yiban}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?}
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+      - --default-time-zone=+00:00
+    volumes:
+      - yiban_mysql_test_data:/var/lib/mysql
+
+volumes:
+  yiban_mysql_test_data:

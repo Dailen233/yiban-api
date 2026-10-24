@@ -1,7 +1,7 @@
 """统一配置模块 - 包含所有环境的配置类"""
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import field_validator
+from pydantic import Field, field_validator
 from typing import List, Dict, Any, Optional
 from enum import Enum
 import os
@@ -49,7 +49,11 @@ class BaseConfig(BaseSettings):
     # =================================================================
     # 数据库基础配置
     # =================================================================
+    # 默认关闭：bootstrap 不连接外部数据库；启用后必须显式配置译伴 DATABASE_URL（不得回退教师示例库）
+    database_enabled: bool = False
     database_url: str = "mysql+pymysql://dev_user:123456@localhost:3306/api_security_demo"
+    # 真实鉴权默认关闭：启用要求数据库已启用且 effective_jwt_secret_key 通过校验
+    auth_enabled: bool = False
     
     # 数据库连接池基础配置
     db_pool_size: int = 10
@@ -97,7 +101,7 @@ class BaseConfig(BaseSettings):
     # =================================================================
     # 应用基础配置
     # =================================================================
-    debug: bool = True
+    debug: bool = Field(default=True, validation_alias="YIBAN_DEBUG")
     log_level: LogLevel = LogLevel.INFO
     timezone: str = "Asia/Shanghai"
     
@@ -110,10 +114,23 @@ class BaseConfig(BaseSettings):
     # 安全基础配置
     # =================================================================
     allowed_hosts: List[str] = ["*"]
-    cors_origins: List[str] = ["*"]
+    # 凭据型 CORS 的精确 origin 白名单（不得 "*"）；与 trusted_origins 对齐
+    cors_origins: List[str] = [
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:8888",
+        "http://127.0.0.1:8888",
+    ]
     cors_allow_credentials: bool = True
     cors_allow_methods: List[str] = ["*"]
     cors_allow_headers: List[str] = ["*"]
+    # 写接口 CSRF/Origin 校验的可信来源白名单（精确匹配，不含通配符）
+    trusted_origins: List[str] = [
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:8888",
+        "http://127.0.0.1:8888",
+    ]
     
     # 速率限制
     rate_limit_enabled: bool = True
@@ -213,7 +230,7 @@ class BaseConfig(BaseSettings):
     
     @field_validator(
         "allowed_hosts", "cors_origins", "cors_allow_methods",
-        "cors_allow_headers", "allowed_file_extensions",
+        "cors_allow_headers", "trusted_origins", "allowed_file_extensions",
         "allowed_mime_types",
         mode="before",
     )
@@ -320,6 +337,9 @@ class BaseConfig(BaseSettings):
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="allow",
+        # 只让 dotenv 匹配已定义字段，不把未匹配键（如旧 DEBUG）引入 extra，
+        # 避免其以小写键遮蔽同名 debug 字段的 model_dump 导出。
+        dotenv_filtering="only_existing",
     )
 
 
@@ -330,7 +350,7 @@ class DevelopmentConfig(BaseConfig):
     # 环境基础配置
     # =================================================================
     environment: Environment = Environment.DEVELOPMENT
-    debug: bool = True
+    debug: bool = Field(default=True, validation_alias="YIBAN_DEBUG")
     log_level: LogLevel = LogLevel.DEBUG
     
     # =================================================================
@@ -490,7 +510,7 @@ class TestingConfig(BaseConfig):
     # 环境基础配置
     # =================================================================
     environment: Environment = Environment.TESTING
-    debug: bool = True
+    debug: bool = Field(default=True, validation_alias="YIBAN_DEBUG")
     log_level: LogLevel = LogLevel.DEBUG
     
     # =================================================================
@@ -552,7 +572,7 @@ class StagingConfig(BaseConfig):
     # 环境基础配置
     # =================================================================
     environment: Environment = Environment.STAGING
-    debug: bool = False
+    debug: bool = Field(default=False, validation_alias="YIBAN_DEBUG")
     log_level: LogLevel = LogLevel.INFO
     
     # =================================================================
@@ -612,7 +632,7 @@ class ProductionConfig(BaseConfig):
     # 环境基础配置
     # =================================================================
     environment: Environment = Environment.PRODUCTION
-    debug: bool = False
+    debug: bool = Field(default=False, validation_alias="YIBAN_DEBUG")
     log_level: LogLevel = LogLevel.WARNING
     
     # =================================================================
@@ -661,9 +681,9 @@ class ProductionConfig(BaseConfig):
     # =================================================================
     # API文档配置 - 生产环境
     # =================================================================
-    docs_url: None  # 生产环境禁用文档
-    redoc_url: None
-    openapi_url: None
+    docs_url: None = None  # 生产环境禁用文档
+    redoc_url: None = None
+    openapi_url: None = None
     
     # =================================================================
     # 性能配置 - 生产环境

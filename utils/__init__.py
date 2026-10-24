@@ -4,7 +4,6 @@
 业务权限（SsoUser 等）请使用 core.permissions。
 """
 
-from utils.auth import JWTAuthenticator, create_jwt_authenticator_from_settings, jwt_authenticator
 from utils.custom_exceptions import (
     AuthenticationException,
     AuthorizationException,
@@ -39,9 +38,6 @@ from utils.validators import (
 )
 
 __all__ = [
-    "JWTAuthenticator",
-    "create_jwt_authenticator_from_settings",
-    "jwt_authenticator",
     "BaseAPIException",
     "AuthenticationException",
     "AuthorizationException",
