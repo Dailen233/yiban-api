@@ -25,7 +25,11 @@ DEV_PORT = "3307"
 DEV_USER = "yiban"
 DEV_CONTAINER = "yiban-mysql-84-dev"
 DEV_VOLUME = "yiban_mysql_dev_data"
-API_ORIGINS = ["http://localhost:5173", "http://localhost:5174"]
+API_ORIGINS = [
+    "http://localhost:5173",
+    "http://localhost:5174",
+    "http://localhost:5175",
+]
 ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
 
 
@@ -86,9 +90,9 @@ def _check_api_env(api: dict[str, str], db: dict[str, str]) -> list[str]:
         problems.append("JWT_SECRET_KEY 缺失或不足 32 字节")
 
     if _parse_origins(api.get("CORS_ORIGINS", "")) != API_ORIGINS:
-        problems.append("CORS_ORIGINS 不是预期的两个前端 Origin（5173/5174）")
+        problems.append("CORS_ORIGINS 不是预期的三个前端 Origin（5173/5174/5175）")
     if _parse_origins(api.get("TRUSTED_ORIGINS", "")) != API_ORIGINS:
-        problems.append("TRUSTED_ORIGINS 不是预期的两个前端 Origin（5173/5174）")
+        problems.append("TRUSTED_ORIGINS 不是预期的三个前端 Origin（5173/5174/5175）")
 
     raw = api.get("DATABASE_URL", "")
     if not raw:
@@ -235,8 +239,8 @@ def _ensure_api_env(db_env: Path, api_env: Path) -> bool:
             "JWT_SECRET_KEY=" + secrets.token_urlsafe(48),
             # 单引号包裹 JSON 数组：uv --env-file 会剥离外层单引号但保留内部双引号，
             # 从而得到合法 JSON；dotenv_values 读取时同样能还原为 JSON 数组字符串。
-            "CORS_ORIGINS='[\"http://localhost:5173\",\"http://localhost:5174\"]'",
-            "TRUSTED_ORIGINS='[\"http://localhost:5173\",\"http://localhost:5174\"]'",
+            "CORS_ORIGINS='[\"http://localhost:5173\",\"http://localhost:5174\",\"http://localhost:5175\"]'",
+            "TRUSTED_ORIGINS='[\"http://localhost:5173\",\"http://localhost:5174\",\"http://localhost:5175\"]'",
             "ALLOWED_HOSTS='[\"localhost\",\"127.0.0.1\"]'",
             "HOST=127.0.0.1",
             "PORT=8001",
