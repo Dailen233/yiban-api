@@ -62,40 +62,28 @@ uv run --env-file .env.dev-api --locked alembic current
 uv run --env-file .env.dev-api --locked uvicorn start:app --host 127.0.0.1 --port 8001 --reload
 ```
 
-后端地址 `http://127.0.0.1:8001`；`/docs` 与 `/openapi.json` 可用。
+后端地址 `http://localhost:8001`（Uvicorn 仍绑定 `127.0.0.1`，浏览器联调统一用 `localhost`）；`/docs` 与 `/openapi.json` 可用。
 
-## 5. 冒烟验证（Cookie jar，不打印 JWT）
+## 5. 安全冒烟（httpx 内存 Cookie jar，不打印 JWT/密码/Cookie）
+
+使用 `scripts/smoke_local.py`：随机邮箱与随机密码，仅输出状态码、必要身份字段与检查结果；不输出请求密码、Cookie 值、Set-Cookie 原文、JWT 或带凭据 URL。覆盖 `/health`、注册→登录→me→退出→再次 me(401) 与两个预留 Origin 的 CORS 预检。
 
 ```bash
-# 健康检查
-curl --noproxy '*' http://127.0.0.1:8001/health
+uv run --env-file .env.dev-api --locked python scripts/smoke_local.py
+```
 
-# 注册（替换 <随机邮箱>，密码 ≥8 字符）
-curl --noproxy '*' -i -X POST http://127.0.0.1:8001/api/v1/auth/register \
-  -H 'Content-Type: application/json' -H 'Origin: http://localhost:5173' -H 'X-Yiban-Request: 1' \
-  -d '{"email":"smoke-<随机>@test.com","password":"Smoke1234!","display_name":"smoke"}'
+预期输出形如（邮箱/密码为随机值，不显示）：
 
-# 登录（Cookie jar 保存会话）
-curl --noproxy '*' -i -c /tmp/yiban.cookies -X POST http://127.0.0.1:8001/api/v1/auth/login \
-  -H 'Content-Type: application/json' -H 'Origin: http://localhost:5173' -H 'X-Yiban-Request: 1' \
-  -d '{"email":"smoke-<随机>@test.com","password":"Smoke1234!"}'
-
-# me（携带 Cookie jar）
-curl --noproxy '*' -i -b /tmp/yiban.cookies http://127.0.0.1:8001/api/v1/auth/me
-
-# 退出
-curl --noproxy '*' -i -b /tmp/yiban.cookies -c /tmp/yiban.cookies -X POST http://127.0.0.1:8001/api/v1/auth/logout \
-  -H 'Origin: http://localhost:5173' -H 'X-Yiban-Request: 1'
-
-# 退出后再次 me 应为 401
-curl --noproxy '*' -i -b /tmp/yiban.cookies http://127.0.0.1:8001/api/v1/auth/me
-
-# 两个预留前端 Origin 的 CORS 预检（应为 200 且回显允许 Origin）
-for o in http://localhost:5173 http://localhost:5174; do
-  curl --noproxy '*' -i -X OPTIONS http://127.0.0.1:8001/api/v1/auth/login \
-    -H "Origin: $o" -H 'Access-Control-Request-Method: POST' \
-    -H 'Access-Control-Request-Headers: x-yiban-request, content-type'
-done
+```text
+/health -> 200 status=ok
+register -> 201 role=user
+login -> 200 has_cookie=True
+me -> 200 role=user
+logout -> 204
+me after logout -> 401
+OPTIONS http://localhost:5173 -> 200 allow=http://localhost:5173
+OPTIONS http://localhost:5174 -> 200 allow=http://localhost:5174
+SMOKE_OK: 冒烟全部通过
 ```
 
 ## 6. 管理员账号（受控 CLI，不预置密码）
