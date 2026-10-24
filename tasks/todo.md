@@ -1,6 +1,6 @@
 # 账号基础落地实施任务
 
-> 状态：**待评审**。对应 `tasks/plan.md`。PingCode：**未关联**（未提供真实编号，不编造）。
+> 状态：**已实施**（任务 1—4 完成，账号后端验收通过）。对应 `tasks/plan.md`。PingCode：**未关联**（未提供真实编号，不编造）。
 > 每个任务完成后系统保持可运行；验收标准为「构建了正确的东西」，叠加在项目通用完成门槛（测试通过、无新告警、不泄露秘密）之上。
 
 ## 任务 1：MySQL 连接、User 模型及对应迁移基础
@@ -50,7 +50,7 @@
 
 ## 任务 3：用户登录/me/退出、会话与鉴权闭环
 
-**Description**：实现 `user_session` 模型 + 迁移；登录签发 JWT（`sub`/`aud=user`/`role` 快照/`jti`/`exp`）并写 `user_session`；**真实签名密钥校验在任务 3 生效（任何真实 JWT 签发前）**；`get_current_user` 真实实现（每次鉴权同时验证 JWT 签名与 `exp`、`session.user_id == JWT.sub`、`session.jti == JWT.jti`、`user_session` 存在且未过期未撤销、`user` 存在，并校验 `aud`/`session_type`/端点绑定）；退出置 `revoked_at` 立即失效；登录/退出写接口 CSRF/Origin（复用并扩展任务 2 的可信 Origin 校验与 `X-Yiban-Request` 请求头）、httpOnly cookie、凭据型 CORS 显式 origin 配置在本批生效。
+**Description**：实现 `user_session` 模型 + 迁移；登录签发 JWT（`sub`/`jti`/`aud=user`/`exp`，不含角色快照，身份与角色以服务端查库为准）并写 `user_session`；**真实签名密钥校验在任务 3 生效（任何真实 JWT 签发前）**；`get_current_user` 真实实现（每次鉴权同时验证 JWT 签名与 `exp`、`session.user_id == JWT.sub`、`session.jti == JWT.jti`、`user_session` 存在且未过期未撤销、`user` 存在，并校验 `aud`/`session_type`/端点绑定）；退出置 `revoked_at` 立即失效；登录/退出写接口 CSRF/Origin（复用并扩展任务 2 的可信 Origin 校验与 `X-Yiban-Request` 请求头）、httpOnly cookie、凭据型 CORS 显式 origin 配置在本批生效。
 
 **Acceptance criteria:**
 - [x] 登录签发 JWT（`sub`/`jti`/`aud=user`/`exp`，无角色快照）+ 写 `user_session(session_type='user')`；JWT `exp` 与 `session.expires_at` 由同一 UTC 到期时刻产生（`expires_at` 存 DATETIME(6) 微秒、`exp` 由 PyJWT 编码时秒级截断）；过期/伪造/已撤销 token 均 401；退出后原 token 立即 401。
@@ -92,10 +92,10 @@
 ---
 
 ## Checkpoint：任务 1-2 后
-- [ ] 迁移可执行、可回滚（独立测试库）；注册闭环通过（重复邮箱、密码边界、角色固定、CSRF/Origin）。
+- [x] 迁移可执行、可回滚（独立测试库）；注册闭环通过（重复邮箱、密码边界、角色固定、CSRF/Origin）。
 
 ## Checkpoint：任务 3-4 后
-- [x] `uv run --locked pytest -q` 全绿（135 passed、0 skipped）；重复注册/错误凭据/过期/退出/越权/密钥校验/CSRF/双端隔离路径全部覆盖。
+- [x] `uv run --locked pytest -q` 全绿（最终账号基线 139 passed、0 skipped、1 条已知上游警告）；重复注册/错误凭据/过期/退出/越权/密钥校验/CSRF/双端隔离路径全部覆盖。
 
 ## 后续任务（不在本批，记录边界）
 - 属主派生的真正落地（upload_file/task/book 的 `owner_id` 服务端注入）留到对应资源实现时验证。

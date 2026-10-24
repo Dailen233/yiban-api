@@ -1,6 +1,6 @@
 # 账号基础落地方案
 
-> 状态：**待评审**。本文为账号模块（注册/登录/角色/会话）的基础落地规划，不包含上传、翻译、任务、书库等后续链路。范围以需求 §3.5「首个真实可运行里程碑」中的账号项 + FR-14/15 + G11 为依据。
+> 状态：**已实施**（任务 1—4 于 2026-10-23 完成，见 `tasks/todo.md`）。本文为账号模块（注册/登录/角色/会话）的落地规划，不包含上传、翻译、任务、书库等后续链路。范围以需求 §3.5「首个真实可运行里程碑」中的账号项 + FR-14/15 + G11 为依据。
 >
 > 本文所有「推荐」均为**本项目拟定**，供评审；不是「老师要求」，也不等于「用户已确认」。涉及待确认的产品项（P12 等）明确标注状态。
 
@@ -17,7 +17,10 @@
 - G11：记录归属到用户、服务端权限校验、管理员独立角色与入口。
 - 数据库逻辑模型 §3.1 `user`、§4.3 属主一致性（冗余 `owner_id` + 服务端强制，非靠物理外键保证）。
 
-### 1.3 当前代码现状（决定复用/替换）
+### 1.3 规划时点代码现状（历史快照，非当前事实）
+
+> 本节为规划撰写时（2026-10，实施前）的代码快照，仅保留作历史依据；部分内容已在任务 1—4 中被替换或实现，不代表当前代码事实。当前实现以 `core/token.py`（固定 HS256 会话 JWT）、`core/permissions.py`（真实鉴权）为准；`utils/auth.py` 与 `core/security.py` 已在账号收口批次删除。
+
 - `core/database.py`：纯异步 `AsyncEngine` + `async_sessionmaker`，`get_async_session` 依赖注入；`_to_async_url` 已支持 `mysql+pymysql → mysql+aiomysql`。
 - `models/base.py`：`BaseModel`（仅 `to_dict`/`update_from_dict`，无公共字段）、`TimestampMixin`、`SoftDeleteMixin`。
 - `utils/security.py`：`SecurityUtil.hash_password/verify_password` 直接使用 `bcrypt`（已锁定 bcrypt 5.0.0）。
@@ -72,6 +75,8 @@
 
 ### 2.3 密码与会话
 
+> **实施修正（任务 3—4，与下文规划口径的差异）**：会话 JWT 由 `core/token.py` 固定 HS256 签发/验签，声明为 `sub`/`jti`/`aud`/`exp`，**不含角色快照**，角色一律查库 `user.role` 得出；未复用 `utils/auth.py::JWTAuthenticator`（该模块已删除）。密码哈希复用 `utils/security.SecurityUtil`。下文中「复用 `JWTAuthenticator`」「`role` 快照」为规划时点表述，以本修正为准。
+
 **密码哈希（推荐 bcrypt，复用现有）**：
 - 复用 `utils/security.SecurityUtil.hash_password/verify_password`（bcrypt 5.0.0，`bcrypt.gensalt()` 默认 **cost 12**）。
 - **长度与字节上限**：最小长度 **8 字符**（待评审 P12）；密码以 **UTF-8 编码后超过 72 字节时明确拒绝（422）**，**不截断**——bcrypt 算法只取前 72 字节，截断会让 `abcd…（72 字节前缀相同）` 的不同密码被误判为相同，故必须在应用层先校验长度。
@@ -99,7 +104,7 @@
 
 ### 2.4 最小接口契约
 
-统一前缀 `/api/v1`，响应沿用 `schemas/response.py`（`success/code/message/data`）与 `utils/custom_exceptions.py` 语义。时间字段输出 ISO 8601 UTC。
+统一前缀 `/api/v1`。**成功响应直接返回业务模型 `{id, email, display_name, role}`，无 `success/code/message/data` 外层**（注册/登录/me 均以 `schemas/auth.py` 的 `RegisterResponse`/`UserResponse` 为准）；登录通过 `Set-Cookie` 设置会话，JSON 不回传 JWT；退出成功为 **204、无响应体**，并清除对应 Cookie。错误响应由 `app/exceptions.py` 统一处理（`ErrorResponse`），沿用现有异常语义，不为本表调整接口代码。时间字段输出 ISO 8601 UTC。
 
 **用户端（Cookie：`yiban_user_session`，JWT `aud=user`）**
 | 方法/路径 | 请求 | 成功响应 | 错误 |
@@ -141,25 +146,31 @@
 
 数据库连接生命周期（lifespan 仅初始化/释放连接资源）在批次 1 生效；注册写接口 CSRF 及可信 Origin/CORS/OPTIONS 在批次 2 准备并生效，登录/退出复用 CSRF 与真实密钥校验在批次 3，管理端写接口 CSRF 在批次 4，不全部推迟到最后一批。
 
-## 5. 基线测试待办（首批实施前处理，本轮仅记录）
+## 5. 基线测试待办（历史记录，已落实）
 
-- `tests/test_production_config.py::test_production_app_disables_docs_and_serves_health` 用 `base_url='http://localhost'`，但 `ProductionConfig.allowed_hosts` 默认是 `["example.com","*.example.com","api.example.com"]`（示例域名，不含 localhost）。当前测试能过，是因为本机私有 `.env` 覆盖了 `ALLOWED_HOSTS`。
-- **修正**：该测试子进程应显式设置 `ALLOWED_HOSTS`（如 `ALLOWED_HOSTS=localhost,127.0.0.1`），不依赖私有 `.env`。此修正放入批次 1 实施前处理；**本轮只记录任务，不修改运行时代码或测试代码**。
+> 本节 ALLOWED_HOSTS 基线修正已在批次 1 实施并验收（`tasks/todo.md` 任务 1）。
+
+- 原问题：`tests/test_production_config.py::test_production_app_disables_docs_and_serves_health` 用 `base_url='http://localhost'`，而 `ProductionConfig.allowed_hosts` 默认是 `["example.com","*.example.com","api.example.com"]`（示例域名，不含 localhost），旧测试依赖本机私有 `.env` 覆盖 `ALLOWED_HOSTS`。
+- **已落实**：该测试子进程显式设置 `ALLOWED_HOSTS`（JSON 数组，如 `["localhost","127.0.0.1"]`）与 `DATABASE_ENABLED=false`，不依赖私有 `.env`。
 
 ## 6. 风险与待评审项
 
+> 状态列已按任务 1—4 实际验收结果更新；仍标「待评审/留后续」的项维持原状态，不擅自标为用户确认或已验收。
+
 | 项 | 状态 | 影响 | 建议 |
 |---|---|---|---|
-| MySQL 8.4 LTS 统一（开发/集成测试/部署） | 待评审 | 本地需 MySQL 8.4 实例 | 独立测试库 + 环境变量注入；SQLite 不作验收依据 |
-| 会话承载 httpOnly cookie vs Bearer | 待评审 | 跨域/CSRF 复杂度 | 推荐双 Cookie + `aud`/`session_type` 绑定 |
-| 密码策略（最小长度/复杂度） | 待评审（P12） | 注册校验 | 建议 ≥8 字符、≤72 字节；具体待定 |
-| 邮箱验证、找回密码 | 建议首版不做（P12/FR-14 待定） | 未实现不得标已验证 | 留后续批次 |
-| 管理员受控创建方式 | 待定 | 无公开注册、无默认密码 | 脚本/CLI 创建，具体待定 |
-| 新依赖（Alembic、email-validator） | 待批准 | 锁文件变更 | 随批次 1/2 引入 |
-| BaseConfig/TestingConfig 的 `cors_origins="*"`+credentials 矛盾 | 需修正 | 凭据型跨域 | 改为显式 origin 白名单 |
-| 弱密钥/占位密钥（`effective_jwt_secret_key`） | 需拒绝 | 令牌可被伪造 | 任务 3 起校验并拒绝空值/教学默认值/`${PROD_SECRET_KEY}` 占位符 |
+| MySQL 8.4 LTS 统一（开发/集成测试/部署） | 已落实（8.4.13） | 本地需 MySQL 8.4 实例 | 独立测试库 + 环境变量注入；SQLite 不作验收依据 |
+| 会话承载 httpOnly cookie vs Bearer | 已落实 | 跨域/CSRF 复杂度 | 双 Cookie（`yiban_user_session`/`yiban_admin_session`）+ `aud`/`session_type` 绑定 |
+| 密码策略（最小长度/复杂度） | 已落地（≥8 字符、≤72 字节）；复杂度待定（P12） | 注册校验 | 具体复杂度留后续 |
+| 邮箱验证、找回密码 | 未实现（P12/FR-14 待定） | 未实现不得标已验证 | 留后续批次 |
+| 管理员受控创建方式 | 已落实 | 无公开注册、无默认密码 | `scripts/create_admin.py` CLI（getpass 二次确认） |
+| 新依赖 | Alembic 已引入；email-validator 未引入 | 锁文件变更 | 邮箱校验用显式正则（`utils/validators.EMAIL_PATTERN`），未加 email-validator |
+| BaseConfig/TestingConfig 的 `cors_origins="*"`+credentials 矛盾 | 已落实 | 凭据型跨域 | 已改为显式 origin 白名单 |
+| 弱密钥/占位密钥（`effective_jwt_secret_key`） | 已落实 | 令牌可被伪造 | 任务 3 起校验并拒绝空值/短密钥/教学默认值/`${PROD_SECRET_KEY}` 占位符 |
 | 物理外键/主键/复合约束 | 留物理模型单独评审 | 属主一致性不靠 FK | 本方案只承诺服务端强制 |
 
-## 7. 边界
+## 7. 边界（规划阶段历史记录）
 
-本轮仅产出 `tasks/plan.md` 与 `tasks/todo.md`，保持运行时代码、依赖、锁文件、数据库、测试与其他仓库原样。不重复运行现有 19 项测试。PingCode：**未关联**（未提供真实编号，不编造）。
+> 本节描述规划阶段（2026-10，实施前）的边界；任务 1—4 实施后已修改运行时代码、测试与迁移，故仅作历史记录，非当前事实。
+
+原规划阶段仅产出 `tasks/plan.md` 与 `tasks/todo.md`，保持运行时代码、依赖、锁文件、数据库、测试与其他仓库原样，不重复运行现有 19 项测试。PingCode：**未关联**（未提供真实编号，不编造）。

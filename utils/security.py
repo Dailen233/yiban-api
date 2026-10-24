@@ -1,7 +1,7 @@
 """通用安全工具（可独立于业务项目使用）
 
 提供密码哈希、盐值/令牌生成、输入安全校验、输入清理、限流键生成等。
-不读项目 config；JWT 装配见 utils.auth，业务 Depends 见 core.permissions。
+不读项目 config；会话 JWT 见 core.token，业务 Depends 见 core.permissions。
 """
 
 import hmac
